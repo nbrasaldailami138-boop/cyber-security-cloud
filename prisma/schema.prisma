@@ -50,6 +50,8 @@ model User {
   webAuthnCredential String?
   webAuthnDeviceId   String?
   lastLoginAt        DateTime?
+  lastSeenAt         DateTime?
+  managementLevel    AcademicLevel?
   lastLoginIp        String?
   failedLoginAttempts Int          @default(0)
   lockedUntil        DateTime?
@@ -117,8 +119,10 @@ model Message {
   receiverId       String
   subject          String?
   body             String
+  encrypted        Boolean   @default(false)
   isRead           Boolean   @default(false)
   isEdited         Boolean   @default(false)
+  isBlocked        Boolean   @default(false)
   senderDeleted    Boolean   @default(false)
   receiverDeleted  Boolean   @default(false)
   createdAt        DateTime  @default(now())
@@ -147,7 +151,9 @@ model Content {
   description String?
   type        ContentType
   fileUrl     String?
+  youtubeUrl  String?
   fileSize    Int?
+  
   subjectId   String?
   subject     Subject?    @relation(fields: [subjectId], references: [id])
   level       AcademicLevel
@@ -332,6 +338,37 @@ model PromotionRequest {
   createdAt    DateTime        @default(now())
 
   @@map("promotion_requests")
+}
+
+// ==================== سجل التوليد ====================
+model GenerationLog {
+  id              String        @id @default(uuid())
+  name            String
+  email           String?
+  role            UserRole
+  level           AcademicLevel
+  code            String
+  subjectName     String?
+  subjectCode     String?
+  semester        Semester?
+  generatedById   String
+  generatedByName String?
+  createdAt       DateTime      @default(now())
+  deletedAt       DateTime?
+
+  @@map("generation_logs")
+}
+
+// ==================== اشتراكات الإشعارات (PWA Push) ====================
+model PushSubscription {
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  endpoint   String
+  authKey    String
+  p256dhKey  String
+  createdAt  DateTime @default(now())
+
+  @@map("push_subscriptions")
 }
 
 // ==================== إعدادات النظام ====================

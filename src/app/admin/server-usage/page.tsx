@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import PageTransition from "@/components/layout/PageTransition";
+import LoadingSkeleton from "@/components/ui/LoadingSkeleton";
 
 export default function AdminServerUsagePage() {
   const router = useRouter();
@@ -56,9 +57,7 @@ export default function AdminServerUsagePage() {
           <p className="text-[#8b949e] text-sm mb-8 text-center">نظرة شاملة على مؤشرات الأداء لمنصة سحابة الأمن السيبراني</p>
 
           {loading ? (
-            <div className="text-center py-20">
-              <div className="animate-spin w-10 h-10 border-2 border-[#00e5ff] border-t-transparent rounded-full mx-auto" />
-            </div>
+            <LoadingSkeleton variant="card" count={3} />
           ) : (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
@@ -68,6 +67,7 @@ export default function AdminServerUsagePage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.08 }}
+                    className="hover-glow"
                     style={{
                       ...glassCard,
                       textAlign: "center",

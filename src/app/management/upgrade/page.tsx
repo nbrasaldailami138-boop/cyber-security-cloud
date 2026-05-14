@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { csrfFetch } from "@/lib/csrfClient";
 import { motion } from "framer-motion";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
@@ -23,7 +24,7 @@ export default function ManagementUpgradePage() {
     setLoading(true);
     setMessage("");
     try {
-      const res = await fetch("/api/admin/upgrade", {
+      const res = await csrfFetch("/api/admin/upgrade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),

@@ -23,7 +23,7 @@ function GlobeMesh() {
   const groupRef = useRef<THREE.Group>(null);
 
   const pointData = useMemo(() => {
-    const count = 2500;
+    const count = 3000;
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
     const sizes = new Float32Array(count);
@@ -35,18 +35,19 @@ function GlobeMesh() {
       positions[i * 3] = p.x;
       positions[i * 3 + 1] = p.y;
       positions[i * 3 + 2] = p.z;
-      const c = new THREE.Color().setHSL(0.55 + Math.random() * 0.15, 0.8, 0.5);
+      const hue = 0.5 + Math.random() * 0.3;
+      const c = new THREE.Color().setHSL(hue, 0.9, 0.5 + Math.random() * 0.2);
       colors[i * 3] = c.r;
       colors[i * 3 + 1] = c.g;
       colors[i * 3 + 2] = c.b;
-      sizes[i] = 0.015 + Math.random() * 0.025;
+      sizes[i] = 0.02 + Math.random() * 0.04;
     }
 
     const linePositions: number[] = [];
     for (let i = 0; i < pts.length; i++) {
       for (let j = i + 1; j < pts.length; j++) {
         const d = pts[i].distanceTo(pts[j]);
-        if (d < 0.8 && Math.random() < 0.03) {
+        if (d < 0.9 && Math.random() < 0.04) {
           linePositions.push(pts[i].x, pts[i].y, pts[i].z);
           linePositions.push(pts[j].x, pts[j].y, pts[j].z);
         }
@@ -60,22 +61,24 @@ function GlobeMesh() {
 
   useFrame((state, delta) => {
     if (groupRef.current) {
-      groupRef.current.rotation.y += delta * 0.06;
+      groupRef.current.rotation.y += delta * 0.08;
     }
     if (glowRef.current) {
-      glowRef.current.rotation.x += delta * 0.01;
-      glowRef.current.rotation.y += delta * 0.02;
+      glowRef.current.rotation.x += delta * 0.015;
+      glowRef.current.rotation.y += delta * 0.025;
     }
     pulseTime.current += delta;
     if (pointsRef.current && pointsRef.current.geometry.attributes.size) {
-      const sizes = pointsRef.current.geometry.attributes.size.array as Float32Array;
+      const sizes = pointsRef.current.geometry.attributes.size
+        .array as Float32Array;
       for (let i = 0; i < sizes.length; i++) {
-        sizes[i] = 0.02 + Math.sin(pulseTime.current * 1.5 + i * 0.1) * 0.015 + 0.005;
+        sizes[i] =
+          0.025 + Math.sin(pulseTime.current * 2 + i * 0.08) * 0.02 + 0.005;
       }
       pointsRef.current.geometry.attributes.size.needsUpdate = true;
     }
     if (linesRef.current) {
-      linesRef.current.rotation.y += delta * 0.06;
+      linesRef.current.rotation.y += delta * 0.08;
     }
   });
 
@@ -94,11 +97,7 @@ function GlobeMesh() {
       {/* طبقة توهج داخلية */}
       <mesh ref={glowRef}>
         <sphereGeometry args={[1.98, 32, 32]} />
-        <meshBasicMaterial
-          color="#00e5ff"
-          transparent
-          opacity={0.03}
-        />
+        <meshBasicMaterial color="#00e5ff" transparent opacity={0.03} />
       </mesh>
 
       {/* النقاط المضيئة النابضة */}
@@ -147,7 +146,7 @@ function GlobeMesh() {
         <lineBasicMaterial
           color="#00e5ff"
           transparent
-          opacity={0.12}
+          opacity={0.2}
           blending={THREE.AdditiveBlending}
         />
       </lineSegments>
@@ -165,6 +164,10 @@ function GlobeMesh() {
         <torusGeometry args={[2.7, 0.003, 16, 100]} />
         <meshBasicMaterial color="#39ff14" transparent opacity={0.1} />
       </mesh>
+      <mesh rotation={[Math.PI / 1.5, 0.5, 0.7]}>
+        <torusGeometry args={[2.45, 0.005, 20, 110]} />
+        <meshBasicMaterial color="#ffca28" transparent opacity={0.12} />
+      </mesh>
     </group>
   );
 }
@@ -173,25 +176,34 @@ function FloatingParticles() {
   const particlesRef = useRef<THREE.Points>(null);
 
   const particles = useMemo(() => {
-    const count = 400;
+    const count = 700;
     const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
     const speeds: number[] = [];
     for (let i = 0; i < count; i++) {
-      const r = 2.5 + Math.random() * 3;
+      const r = 2.5 + Math.random() * 3.5;
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
       positions[i * 3] = Math.sin(phi) * Math.cos(theta) * r;
       positions[i * 3 + 1] = Math.sin(phi) * Math.sin(theta) * r;
       positions[i * 3 + 2] = Math.cos(phi) * r;
       speeds.push(0.002 + Math.random() * 0.006);
+      const c = new THREE.Color().setHSL(
+        0.5 + Math.random() * 0.3,
+        0.8,
+        0.4 + Math.random() * 0.3,
+      );
+      colors[i * 3] = c.r;
+      colors[i * 3 + 1] = c.g;
+      colors[i * 3 + 2] = c.b;
     }
-    return { positions, speeds };
+    return { positions, colors, speeds };
   }, []);
 
   useFrame((_, delta) => {
     if (particlesRef.current) {
-      particlesRef.current.rotation.y += delta * 0.015;
-      particlesRef.current.rotation.x += delta * 0.005;
+      particlesRef.current.rotation.y += delta * 0.02;
+      particlesRef.current.rotation.x += delta * 0.008;
     }
   });
 
@@ -200,18 +212,25 @@ function FloatingParticles() {
       <bufferGeometry>
         <bufferAttribute
           attach="attributes-position"
-          count={400}
+          count={700}
           array={particles.positions}
+          itemSize={3}
+        />
+        <bufferAttribute
+          attach="attributes-color"
+          count={700}
+          array={particles.colors}
           itemSize={3}
         />
       </bufferGeometry>
       <pointsMaterial
-        color="#00e5ff"
-        size={0.015}
+        size={0.02}
         transparent
-        opacity={0.3}
+        opacity={0.35}
+        vertexColors
         blending={THREE.AdditiveBlending}
         depthWrite={false}
+        sizeAttenuation
       />
     </points>
   );
@@ -232,14 +251,25 @@ function DynamicLights() {
     if (light2Ref.current) {
       light2Ref.current.position.x = Math.sin(timeRef.current + 2) * 7;
       light2Ref.current.position.z = Math.cos(timeRef.current + 2) * 7;
-      light2Ref.current.intensity = 0.3 + Math.cos(timeRef.current * 1.2) * 0.15;
+      light2Ref.current.intensity =
+        0.3 + Math.cos(timeRef.current * 1.2) * 0.15;
     }
   });
 
   return (
     <>
-      <pointLight ref={light1Ref} position={[8, 4, 0]} intensity={0.5} color="#00e5ff" />
-      <pointLight ref={light2Ref} position={[-6, -3, 6]} intensity={0.4} color="#bf5af2" />
+      <pointLight
+        ref={light1Ref}
+        position={[8, 4, 0]}
+        intensity={0.5}
+        color="#00e5ff"
+      />
+      <pointLight
+        ref={light2Ref}
+        position={[-6, -3, 6]}
+        intensity={0.4}
+        color="#bf5af2"
+      />
       <ambientLight intensity={0.15} />
     </>
   );
@@ -247,7 +277,7 @@ function DynamicLights() {
 
 export default function CyberGlobe() {
   return (
-    <div className="absolute inset-0 z-0 opacity-70">
+    <div className="absolute inset-0 z-0">
       <Canvas
         camera={{ position: [0, 0, 6], fov: 45 }}
         gl={{ antialias: true, alpha: true }}

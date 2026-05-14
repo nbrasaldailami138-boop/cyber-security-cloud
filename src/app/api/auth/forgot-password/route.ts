@@ -3,10 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { sendEmail, generateResetPasswordEmail } from "@/lib/email";
 import { passwordResetRateLimiter } from "@/lib/ratelimit";
 import { generateSecureToken, hashToken } from "@/lib/security";
+import { verifyCaptcha } from "@/lib/captcha";
 import { z } from "zod";
 
 const forgotSchema = z.object({
   email: z.string().email("بريد إلكتروني غير صالح"),
+  captchaToken: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -31,7 +33,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { email } = validation.data;
+    const { email, captchaToken } = validation.data;
+
+    // التحقق من CAPTCHA
+    const captchaOk = await verifyCaptcha(captchaToken || null);
+    if (!captchaOk) {
+      return NextResponse.json(
+        { success: false, message: "التحقق البشري فشل. حاول مرة أخرى." },
+        { status: 400 },
+      );
+    }
 
     // البحث عن المستخدم
     const user = await prisma.user.findUnique({
@@ -54,7 +65,7 @@ export async function POST(request: NextRequest) {
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        activationCodeHash: codeHash, // إعادة استخدام الحقل مؤقتاً
+        activationCodeHash: codeHash,
         activationExpires: new Date(Date.now() + 30 * 60 * 1000), // 30 دقيقة
       },
     });

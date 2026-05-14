@@ -5,6 +5,9 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import Sidebar from "@/components/layout/Sidebar";
 import PageTransition from "@/components/layout/PageTransition";
+import Pagination from "@/components/ui/Pagination";
+import { usePagination } from "@/hooks/usePagination";
+import { pageContainer, mainContent, sectionTitle } from "@/lib/theme";
 
 interface LogItem {
   id: string;
@@ -20,15 +23,20 @@ interface LogItem {
 export default function AuditLogPage() {
   const [logs, setLogs] = useState<LogItem[]>([]);
 
+  const pag = usePagination(1, 20);
+
   useEffect(() => {
     loadLogs();
-  }, []);
+  }, [pag.page]);
 
   const loadLogs = async () => {
     try {
-      const res = await fetch("/api/admin/audit-log");
+      const res = await fetch(`/api/admin/audit-log?page=${pag.page}&limit=${pag.limit}`);
       const data = await res.json();
-      if (data.success) setLogs(data.data);
+      if (data.success) {
+        setLogs(data.data);
+        pag.setTotal(data.total || 0);
+      }
     } catch (err) {}
   };
 
@@ -63,32 +71,12 @@ export default function AuditLogPage() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#010204",
-        fontFamily: "'Cairo', sans-serif",
-        color: "#fff",
-      }}
-    >
+    <div style={pageContainer}>
       <Header />
       <Sidebar />
       <PageTransition>
-      <main
-        style={{
-          padding: "100px 20px 60px",
-          maxWidth: "1200px",
-          margin: "0 auto",
-        }}
-      >
-        <h2
-          style={{
-            color: "#00e5ff",
-            fontSize: "1.8rem",
-            fontWeight: 800,
-            marginBottom: "25px",
-          }}
-        >
+      <main style={mainContent}>
+        <h2 style={sectionTitle}>
           📜 سجل العمليات
         </h2>
 
@@ -164,6 +152,7 @@ export default function AuditLogPage() {
             </tbody>
           </table>
         </div>
+        <Pagination page={pag.page} totalPages={pag.totalPages} onPageChange={pag.goTo} />
       </main>
       </PageTransition>
       <Footer />

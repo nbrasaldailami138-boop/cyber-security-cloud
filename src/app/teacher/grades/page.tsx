@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import PageTransition from "@/components/layout/PageTransition";
+import { csrfFetch } from "@/lib/csrfClient";
 
 export default function TeacherGradesPage() {
   const router = useRouter();
@@ -37,6 +38,7 @@ export default function TeacherGradesPage() {
     try {
       const res = await fetch("/api/grades/list?limit=50");
       const data = await res.json();
+      if (data.success) setDistributions(data.data || []);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
@@ -52,7 +54,7 @@ export default function TeacherGradesPage() {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("subjectId", subjectId);
-      const res = await fetch("/api/grades/upload", {
+      const res = await csrfFetch("/api/grades/upload", {
         method: "POST",
         body: formData,
       });
@@ -72,7 +74,7 @@ export default function TeacherGradesPage() {
 
   const handleDistribute = async (id: string) => {
     try {
-      const res = await fetch("/api/grades/distribute", {
+      const res = await csrfFetch("/api/grades/distribute", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ gradeDistributionId: id }),

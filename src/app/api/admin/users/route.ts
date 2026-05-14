@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies();
@@ -24,16 +26,26 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const userRole = payload.role as string;
+    const userLevel = payload.level as string;
+
     const { searchParams } = new URL(request.url);
     const level = searchParams.get("level");
     const role = searchParams.get("role");
     const status = searchParams.get("status");
+    const search = searchParams.get("search");
+    const email = searchParams.get("email");
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+    const limit = Math.min(
+      100,
+      Math.max(1, parseInt(searchParams.get("limit") || "20")),
+    );
 
     const where: any = { deletedAt: null };
 
     // عزل أكاديمي للإدارة
-    if (payload.role === "MANAGEMENT" && payload.level) {
-      where.level = payload.level as string;
+    if (userRole === "MANAGEMENT" && userLevel) {
+      where.level = userLevel;
     } else if (level) {
       where.level = level;
     }
@@ -41,49 +53,54 @@ export async function GET(request: NextRequest) {
     if (role) where.role = role;
     if (status) where.status = status;
 
-    const users = await prisma.user.findMany({
-      where,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        level: true,
-        status: true,
-        isActivated: true,
-        createdAt: true,
-        lastLoginAt: true,
-      },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-    });
+    // البحث بالاسم
+    if (search && search.trim()) {
+      where.name = { contains: search.trim(), mode: "insensitive" };
+    }
 
-    // جلب الأكواد غير المستخدمة
-    const codes = await prisma.activationCode.findMany({
-      where: {
-        usedAt: null,
-        expiresAt: { gt: new Date() },
-        ...(payload.role === "MANAGEMENT" && payload.level
-          ? { level: payload.level as any }
-          : {}),
-        ...(level ? { level: level as any } : {}),
-      },
-      select: {
-        id: true,
-        codeHash: true,
-        level: true,
-        role: true,
-        createdAt: true,
-        expiresAt: true,
-        usedAt: true,
-        usedBy: true,
-      },
-      take: 50,
-    });
+    // البحث بالإيميل
+    if (email && email.trim()) {
+      where.email = { contains: email.trim(), mode: "insensitive" };
+    }
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          level: true,
+          status: true,
+          isActivated: true,
+          createdAt: true,
+          managementLevel: true,
+          lastLoginAt: true,
+          uploadPermissions: {
+            where: { revokedAt: null },
+            select: {
+              id: true,
+              grantedBy: true,
+              grantedAt: true,
+            },
+            orderBy: { grantedAt: "desc" },
+            take: 1,
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.user.count({ where }),
+    ]);
 
     return NextResponse.json({
       success: true,
-      data: { users, codes },
+      data: users,
+      total,
+      page,
+      limit,
     });
   } catch (error: any) {
     console.error("Get Users Error:", error);

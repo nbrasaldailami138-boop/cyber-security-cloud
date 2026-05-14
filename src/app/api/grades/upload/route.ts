@@ -4,6 +4,7 @@ import { jwtVerify } from "jose";
 import { prisma } from "@/lib/prisma";
 import { imagekit } from "@/lib/imagekit";
 import { APP_CONFIG } from "@/config";
+import { scanAndReject } from "@/lib/clamav";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
 
@@ -65,6 +66,15 @@ export async function POST(request: NextRequest) {
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
+
+    // فحص الفيروسات
+    const infected = await scanAndReject(buffer, file.name, userId);
+    if (infected) {
+      return NextResponse.json(
+        { success: false, message: "الملف مصاب بفيروس! تم رفض الرفع." },
+        { status: 400 },
+      );
+    }
 
     const uploadResponse = await imagekit.upload({
       file: buffer.toString("base64"),

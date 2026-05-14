@@ -3,12 +3,15 @@ import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
 import MatrixRain from "@/components/effects/MatrixRain";
 import NeonParticles from "@/components/effects/NeonParticles";
+import ScanLine from "@/components/effects/ScanLine";
+import PageTransition from "@/components/layout/PageTransition";
+import FloatingBell from "@/components/ui/FloatingBell";
+import AnimationsProvider from "@/components/providers/AnimationsProvider";
 import dynamic from "next/dynamic";
 
-const OnboardingScene = dynamic(
-  () => import("@/components/effects/OnboardingScene"),
-  { ssr: false },
-);
+const CyberGlobe = dynamic(() => import("@/components/effects/CyberGlobe"), {
+  ssr: false,
+});
 export const metadata: Metadata = {
   title: "سحابة الأمن السيبراني - جامعة ذمار",
   description:
@@ -39,20 +42,31 @@ export default function RootLayout({
       <body className="min-h-screen bg-[#010204] text-[#e6edf3] antialiased font-[Cairo]">
         {/* خلفيات لجميع الصفحات */}
         <div className="fixed inset-0 z-0 pointer-events-none">
-          <div className="absolute inset-0 quantum-grid opacity-50" />
+          {/* شبكة خلفية */}
+          <div className="absolute inset-0 quantum-grid opacity-20" />
+          {/* كرة أرضية ثلاثية الأبعاد */}
+          <div className="absolute inset-0 opacity-80">
+            <CyberGlobe />
+          </div>
+          {/* جزيئات نيون عائمة */}
           <div className="absolute inset-0">
             <NeonParticles />
           </div>
-          <div className="absolute inset-0">
+          {/* مطر الماتريكس */}
+          <div className="absolute inset-0 opacity-25">
             <MatrixRain />
           </div>
-          <div className="absolute inset-0 hidden lg:block opacity-15">
-            <OnboardingScene showCard={false} />
-          </div>
+          {/* خط مسح ديناميكي */}
+          <ScanLine />
         </div>
 
         <div className="relative z-10">
-          <ToastProvider>{children}</ToastProvider>
+          <ToastProvider>
+            <AnimationsProvider>
+              <PageTransition>{children}</PageTransition>
+              <FloatingBell />
+            </AnimationsProvider>
+          </ToastProvider>
         </div>
       </body>
     </html>

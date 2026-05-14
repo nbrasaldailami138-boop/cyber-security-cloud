@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashToken } from "@/lib/security";
+import { verifyCaptcha } from "@/lib/captcha";
 import argon2 from "argon2";
 import { z } from "zod";
-import crypto from "crypto";
 
 const activateSchema = z
   .object({
-    code: z.string().min(6, "كود التفعيل غير صحيح"),
+    code: z.string().min(4, "كود التفعيل غير صحيح"),
     email: z.string().email("بريد إلكتروني غير صالح"),
     password: z.string().min(8, "كلمة المرور يجب أن تكون 8 أحرف على الأقل"),
     confirmPassword: z.string(),
+    captchaToken: z.string().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "كلمتا المرور غير متطابقتين",
@@ -28,17 +29,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { code, email, password } = validation.data;
+    const { code, email, password, captchaToken } = validation.data;
     const ip = request.headers.get("x-forwarded-for") || "unknown";
 
-    // التحقق من وجود المستخدم
-    const user = await prisma.user.findUnique({
-      where: { email },
+    // التحقق من CAPTCHA
+    const captchaOk = await verifyCaptcha(captchaToken || null);
+    if (!captchaOk) {
+      return NextResponse.json(
+        { success: false, message: "التحقق البشري فشل. حاول مرة أخرى." },
+        { status: 400 },
+      );
+    }
+
+    const codeHash = hashToken(code);
+
+    // البحث عن المستخدم بواسطة كود التفعيل (وليس البريد الإلكتروني)
+    const user = await prisma.user.findFirst({
+      where: {
+        activationCodeHash: codeHash,
+        isActivated: false,
+        status: "PENDING",
+        deletedAt: null,
+      },
     });
 
     if (!user) {
+      const activationCode = await prisma.activationCode.findFirst({
+        where: { codeHash, usedAt: null, expiresAt: { gt: new Date() } },
+      });
+      if (!activationCode) {
+        return NextResponse.json(
+          { success: false, message: "كود التفعيل غير صحيح أو منتهي الصلاحية" },
+          { status: 400 },
+        );
+      }
       return NextResponse.json(
-        { success: false, message: "البريد الإلكتروني غير موجود في النظام" },
+        { success: false, message: "المستخدم المرتبط بكود التفعيل غير موجود" },
         { status: 404 },
       );
     }
@@ -50,8 +76,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // التحقق من كود التفعيل
-    const codeHash = hashToken(code);
+    // التحقق من أن البريد الإلكتروني غير مستخدم مسبقاً
+    const existingEmail = await prisma.user.findUnique({ where: { email } });
+    if (existingEmail && existingEmail.id !== user.id) {
+      return NextResponse.json(
+        { success: false, message: "البريد الإلكتروني مستخدم بالفعل في حساب آخر" },
+        { status: 400 },
+      );
+    }
+
+    // التحقق من صحة كود التفعيل في جدول الأكواد
     const activationCode = await prisma.activationCode.findFirst({
       where: {
         codeHash,
@@ -75,10 +109,11 @@ export async function POST(request: NextRequest) {
       parallelism: 4,
     });
 
-    // تحديث المستخدم
+    // تحديث المستخدم: حفظ البريد الإلكتروني الشخصي + كلمة المرور + تفعيل الحساب
     await prisma.user.update({
       where: { id: user.id },
       data: {
+        email,
         passwordHash,
         isActivated: true,
         status: "ACTIVE",
@@ -111,6 +146,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       status: "success",
       message: "تم تفعيل الحساب بنجاح. يمكنك الآن تسجيل الدخول.",
+      data: {
+        role: user.role,
+        level: user.level,
+        name: user.name,
+      },
     });
   } catch (error: any) {
     console.error("Activate Error:", error);

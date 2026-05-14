@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { prisma } from "@/lib/prisma";
+import { triggerNotification, triggerAssignmentUpdate } from "@/lib/pusherService";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
 
@@ -91,7 +92,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    await prisma.notification.create({
+    const notification = await prisma.notification.create({
       data: {
         userId: assignment.studentId,
         type: "ASSIGNMENT_EVALUATED",
@@ -99,6 +100,21 @@ export async function POST(request: NextRequest) {
         body: `تم تقييم تكليفك في مادة ${assignment.subject.name} بمقدار ${grade} درجة`,
         linkUrl: "/student",
       },
+    });
+
+    // إشعار فوري عبر Pusher
+    await triggerNotification(assignment.studentId, {
+      id: notification.id,
+      type: "ASSIGNMENT_EVALUATED",
+      title: "تم تقييم التكليف",
+      body: `تم تقييم تكليفك في مادة ${assignment.subject.name} بمقدار ${grade} درجة`,
+      linkUrl: "/student",
+    });
+    await triggerAssignmentUpdate(assignment.studentId, {
+      id: assignmentId,
+      subjectName: assignment.subject.name,
+      grade,
+      status: "evaluated",
     });
 
     await prisma.auditLog.create({

@@ -28,8 +28,14 @@ export async function GET(request: NextRequest) {
         level: true,
         status: true,
         isActivated: true,
+        twoFactorEnabled: true,
+        webAuthnEnabled: true,
         createdAt: true,
         lastLoginAt: true,
+        uploadPermissions: {
+          where: { revokedAt: null },
+          select: { id: true, grantedAt: true },
+        },
       },
     });
 
@@ -46,7 +52,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: {
+      user: {
         ...user,
         stats: { assignmentsCount },
       },

@@ -1,14 +1,4 @@
-import nodemailer from "nodemailer";
-
-const transporter = nodemailer.createTransport({
-  host: "smtp-relay.brevo.com",
-  port: 587,
-  secure: false,
-  auth: {
-    user: "a97358001@smtp-brevo.com",
-    pass: "xsmtpsib-5f68d591cd070765fa65cf980d846f22ad6527fc9b7988d5c9717160bd5e7cb2-9NmTWY4nmmeJdAyC",
-  },
-});
+const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
 interface SendEmailOptions {
   to: string;
@@ -21,7 +11,50 @@ export async function sendEmail({
   subject,
   html,
 }: SendEmailOptions): Promise<boolean> {
+  // المحاولة الأولى: Brevo API
   try {
+    const apiKey = process.env.BREVO_API_KEY;
+    if (apiKey) {
+      const res = await fetch(BREVO_API_URL, {
+        method: "POST",
+        headers: {
+          "api-key": apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sender: {
+            name: process.env.BREVO_FROM_NAME || "سحابة الأمن السيبراني",
+            email:
+              process.env.BREVO_FROM_EMAIL || "nbrasaldailami138@gmail.com",
+          },
+          to: [{ email: to }],
+          subject,
+          htmlContent: html,
+        }),
+      });
+
+      if (res.ok) {
+        return true;
+      }
+      console.error("Brevo API error:", await res.text());
+    }
+  } catch (error) {
+    console.error("Brevo API failed:", error);
+  }
+
+  // المحاولة الثانية: SMTP
+  try {
+    const nodemailer = await import("nodemailer");
+    const transporter = nodemailer.default.createTransport({
+      host: process.env.BREVO_SMTP_HOST || "smtp-relay.brevo.com",
+      port: Number(process.env.BREVO_SMTP_PORT) || 587,
+      secure: false,
+      auth: {
+        user: process.env.BREVO_SMTP_USER || "",
+        pass: process.env.BREVO_SMTP_KEY || "",
+      },
+    });
+
     await transporter.sendMail({
       from: `"${process.env.BREVO_FROM_NAME}" <${process.env.BREVO_FROM_EMAIL}>`,
       to,
@@ -30,7 +63,7 @@ export async function sendEmail({
     });
     return true;
   } catch (error) {
-    console.error("Email sending failed:", error);
+    console.error("SMTP also failed:", error);
     return false;
   }
 }

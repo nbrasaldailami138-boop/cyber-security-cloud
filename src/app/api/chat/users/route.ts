@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies();
@@ -23,55 +25,63 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
+    const filterLevel = searchParams.get("level") || "";
+    const filterRole = searchParams.get("role") || "";
 
-    const currentUser = await prisma.user.findUnique({ where: { id: userId } });
-    if (!currentUser) {
-      return NextResponse.json(
-        { success: false, message: "المستخدم غير موجود" },
-        { status: 404 },
-      );
-    }
-
-    // تحديد من يمكنه المراسلة حسب العزل الأكاديمي
     const where: any = {
       id: { not: userId },
       deletedAt: null,
-      status: "ACTIVE",
+      isActivated: true,
     };
 
-    if (search) {
-      where.name = { contains: search };
+    if (search && search.trim()) {
+      where.name = { contains: search.trim(), mode: "insensitive" };
     }
 
-    // طالب: يرى معلمي مستواه + إدارة مستواه + الأدمن
+    // العزل الأكاديمي
     if (userRole === "STUDENT") {
       where.OR = [
         { role: "ADMIN" },
         { role: "MANAGEMENT", level: userLevel },
         { role: "TEACHER", level: userLevel },
       ];
-    }
-    // معلم: يرى طلاب مستواه + إدارة مستواه + الأدمن
-    else if (userRole === "TEACHER") {
+    } else if (userRole === "TEACHER") {
       where.OR = [
         { role: "ADMIN" },
         { role: "MANAGEMENT", level: userLevel },
         { role: "STUDENT", level: userLevel },
       ];
-    }
-    // إدارة: يرى معلمين وطلاب مستواها + الأدمن
-    else if (userRole === "MANAGEMENT") {
-      where.OR = [
-        { role: "ADMIN" },
-        { role: "TEACHER", level: userLevel },
-        { role: "STUDENT", level: userLevel },
-      ];
+    } else if (userRole === "MANAGEMENT") {
+      if (filterRole === "STUDENT") {
+        where.role = "STUDENT";
+        where.level = userLevel;
+      } else if (filterRole === "TEACHER") {
+        where.role = "TEACHER";
+        where.level = userLevel;
+      } else {
+        where.OR = [
+          { role: "ADMIN" },
+          { role: "TEACHER", level: userLevel },
+          { role: "STUDENT", level: userLevel },
+        ];
+      }
+    } else if (userRole === "ADMIN") {
+      if (filterLevel) where.level = filterLevel;
+      if (filterRole) where.role = filterRole;
     }
 
     const users = await prisma.user.findMany({
       where,
-      select: { id: true, name: true, role: true, level: true },
-      take: 20,
+      select: {
+        id: true,
+        name: true,
+        role: true,
+        level: true,
+        lastSeenAt: true,
+        lastLoginAt: true,
+      },
+      orderBy: { name: "asc" },
+      take: 50,
     });
 
     return NextResponse.json({ success: true, data: users });

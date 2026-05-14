@@ -1,391 +1,180 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import PageTransition from "@/components/layout/PageTransition";
 
-export default function GenerationPage() {
-  const [names, setNames] = useState("");
-  const [level, setLevel] = useState("LEVEL_1");
-  const [role, setRole] = useState("STUDENT");
-  const [subjectName, setSubjectName] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<any[]>([]);
-  const [error, setError] = useState("");
+const glassCard: React.CSSProperties = {
+  background: "rgba(13, 17, 23, 0.92)",
+  backdropFilter: "blur(20px)",
+  WebkitBackdropFilter: "blur(20px)",
+  border: "1px solid rgba(0,229,255,0.2)",
+  borderRadius: "16px",
+};
 
-  const handleGenerate = async () => {
-    if (!names.trim()) {
-      setError("يرجى إدخال اسم واحد على الأقل");
-      return;
-    }
+export default function GenerationHub() {
+  const router = useRouter();
+  const [userRole, setUserRole] = useState<string>("");
+  const [userLevel, setUserLevel] = useState<string>("");
+  const [mounted, setMounted] = useState(false);
 
-    setLoading(true);
-    setError("");
-    setResults([]);
+  useEffect(() => {
+    setUserRole(localStorage.getItem("userRole") || "");
+    setUserLevel(localStorage.getItem("userLevel") || "");
+    setMounted(true);
+  }, []);
 
-    try {
-      const namesArray = names
-        .split("\n")
-        .map((n) => n.trim())
-        .filter((n) => n.length > 0);
+  const isAdmin = userRole === "ADMIN";
 
-      const res = await fetch("/api/admin/generate-codes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          names: namesArray,
-          level,
-          role,
-          subjectName: role === "TEACHER" ? subjectName : undefined,
-        }),
-      });
+  const sections = [
+    {
+      id: "students",
+      icon: "👨‍🎓",
+      title: "توليد حسابات الطلاب",
+      desc: "إدخال أسماء الطلاب وتوليد أكواد التفعيل مع سجل كامل",
+      color: "#00e5ff",
+      href: "/admin/generation/students",
+      allowed: true,
+    },
+    {
+      id: "subjects",
+      icon: "📚",
+      title: "توليد المواد الدراسية",
+      desc: "إضافة مواد دراسية مع توليد حسابات المعلمين وأكواد التفعيل",
+      color: "#bf5af2",
+      href: "/admin/generation/subjects",
+      allowed: true,
+    },
+    {
+      id: "management",
+      icon: "👔",
+      title: "توليد حسابات الإدارة",
+      desc: "توليد حسابات إدارة للمستويات الدراسية مع أكواد التفعيل",
+      color: "#ffca28",
+      href: "/admin/generation/management",
+      allowed: isAdmin,
+    },
+  ];
 
-      const data = await res.json();
-      if (data.status === "success") {
-        setResults(data.data);
-      } else {
-        setError(data.message || "فشل التوليد");
-      }
-    } catch (err: any) {
-      setError("فشل الاتصال بالخادم");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleExport = () => {
-    if (results.length === 0) return;
-
-    let csv = "الاسم,البريد الإلكتروني,كود التفعيل,الرتبة,المستوى\n";
-    results.forEach((r) => {
-      if (!r.error) {
-        csv += `${r.name},${r.email},${r.code},${r.role},${r.level}\n`;
-      }
-    });
-
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `activation-codes-${Date.now()}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
+  if (!mounted) return null;
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#010204",
-        fontFamily: "'Cairo', sans-serif",
-        color: "#fff",
-      }}
-    >
+    <div style={{ minHeight: "100vh", fontFamily: "'Cairo', sans-serif", color: "#fff" }}>
       <Header />
-
       <PageTransition>
-      <main
-        style={{
-          paddingTop: "100px",
-          paddingBottom: "80px",
-          maxWidth: "900px",
-          margin: "0 auto",
-          padding: "100px 20px 80px",
-        }}
-      >
-        <div
-          style={{
-            background: "rgba(10, 20, 40, 0.5)",
-            backdropFilter: "blur(25px)",
-            border: "1px solid rgba(0, 229, 255, 0.2)",
-            borderRadius: "20px",
-            padding: "30px",
-          }}
-        >
-          <h2
-            style={{
-              color: "#00e5ff",
-              fontSize: "1.5rem",
-              fontWeight: 800,
-              marginBottom: "20px",
-              textAlign: "center",
-            }}
+        <main style={{ position: "relative", zIndex: 1, paddingTop: "100px", paddingBottom: "80px", maxWidth: "1000px", margin: "0 auto", padding: "100px 20px 80px" }}>
+          {/* شريط الأدمن العلوي - أيقونات سريعة */}
+          {mounted && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                gap: "16px",
+                marginBottom: "40px",
+                flexWrap: "wrap",
+              }}
+            >
+              {sections.filter((s) => s.allowed).map((section) => (
+                <motion.button
+                  key={section.id}
+                  whileHover={{ scale: 1.08, y: -5 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => router.push(section.href)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    padding: "14px 28px",
+                    background: `linear-gradient(135deg, ${section.color}22, transparent)`,
+                    border: `1px solid ${section.color}44`,
+                    borderRadius: "14px",
+                    color: section.color,
+                    fontSize: "1rem",
+                    fontWeight: 700,
+                    fontFamily: "'Cairo', sans-serif",
+                    cursor: "pointer",
+                    transition: "all 0.3s",
+                    boxShadow: `0 0 20px ${section.color}11`,
+                  }}
+                >
+                  <span style={{ fontSize: "1.8rem" }}>{section.icon}</span>
+                  <span>{section.title}</span>
+                  <span style={{
+                    background: `${section.color}22`,
+                    padding: "2px 8px",
+                    borderRadius: "20px",
+                    fontSize: "0.7rem",
+                    color: section.color,
+                  }}>
+                    {isAdmin ? "الأدمن" : userLevel === "LEVEL_1" ? "المستوى الأول" : "المستوى الثاني"}
+                  </span>
+                </motion.button>
+              ))}
+            </motion.div>
+          )}
+
+          <motion.h2
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{ color: "#00e5ff", fontSize: "2rem", fontWeight: 800, marginBottom: "10px", textAlign: "center", textShadow: "0 0 20px rgba(0,229,255,0.3)" }}
           >
             🏗️ إدارة التوليد
-          </h2>
+          </motion.h2>
+          <p style={{ color: "#8b949e", textAlign: "center", marginBottom: "40px", fontSize: "1rem" }}>
+            {isAdmin ? "الأدمن - جميع المستويات" : `الإدارة - ${userLevel === "LEVEL_1" ? "المستوى الأول" : "المستوى الثاني"}`}
+          </p>
 
-          {/* اختيار الرتبة */}
-          <div style={{ marginBottom: "15px" }}>
-            <label
-              style={{
-                color: "#8b949e",
-                marginBottom: "5px",
-                display: "block",
-              }}
-            >
-              نوع الحساب
-            </label>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "12px",
-                background: "rgba(0,0,0,0.5)",
-                border: "1px solid rgba(255,255,255,0.12)",
-                borderRadius: "12px",
-                color: "#fff",
-                fontFamily: "'Cairo', sans-serif",
-                fontSize: "0.95rem",
-              }}
-            >
-              <option value="STUDENT">طالب</option>
-              <option value="TEACHER">معلم</option>
-              <option value="MANAGEMENT">إدارة</option>
-            </select>
-          </div>
-
-          {/* اختيار المستوى */}
-          <div style={{ marginBottom: "15px" }}>
-            <label
-              style={{
-                color: "#8b949e",
-                marginBottom: "5px",
-                display: "block",
-              }}
-            >
-              المستوى الدراسي
-            </label>
-            <select
-              value={level}
-              onChange={(e) => setLevel(e.target.value)}
-              style={{
-                width: "100%",
-                padding: "12px",
-                background: "rgba(0,0,0,0.5)",
-                border: "1px solid rgba(255,255,255,0.12)",
-                borderRadius: "12px",
-                color: "#fff",
-                fontFamily: "'Cairo', sans-serif",
-                fontSize: "0.95rem",
-              }}
-            >
-              <option value="LEVEL_1">المستوى الأول</option>
-              <option value="LEVEL_2">المستوى الثاني</option>
-            </select>
-          </div>
-
-          {/* اسم المادة (للمعلم فقط) */}
-          {role === "TEACHER" && (
-            <div style={{ marginBottom: "15px" }}>
-              <label
-                style={{
-                  color: "#8b949e",
-                  marginBottom: "5px",
-                  display: "block",
-                }}
-              >
-                اسم المادة
-              </label>
-              <input
-                type="text"
-                placeholder="مثلاً: أمن الشبكات"
-                value={subjectName}
-                onChange={(e) => setSubjectName(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "12px",
-                  background: "rgba(0,0,0,0.5)",
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  borderRadius: "12px",
-                  color: "#fff",
-                  fontFamily: "'Cairo', sans-serif",
-                  fontSize: "0.95rem",
-                  textAlign: "center",
-                }}
-              />
-            </div>
-          )}
-
-          {/* حقل الأسماء */}
-          <div style={{ marginBottom: "15px" }}>
-            <label
-              style={{
-                color: "#8b949e",
-                marginBottom: "5px",
-                display: "block",
-              }}
-            >
-              الأسماء (اسم واحد في كل سطر)
-            </label>
-            <textarea
-              placeholder={`أحمد محمد\nفاطمة علي\nعمر سالم\n...`}
-              value={names}
-              onChange={(e) => setNames(e.target.value)}
-              rows={8}
-              style={{
-                width: "100%",
-                padding: "12px",
-                background: "rgba(0,0,0,0.5)",
-                border: "1px solid rgba(255,255,255,0.12)",
-                borderRadius: "12px",
-                color: "#fff",
-                fontFamily: "'Cairo', sans-serif",
-                fontSize: "0.95rem",
-                textAlign: "right",
-                resize: "vertical",
-              }}
-            />
-          </div>
-
-          {error && (
-            <div
-              style={{
-                background: "rgba(248, 81, 73, 0.1)",
-                border: "1px solid #f85149",
-                color: "#f85149",
-                padding: "12px",
-                borderRadius: "12px",
-                marginBottom: "15px",
-              }}
-            >
-              {error}
-            </div>
-          )}
-
-          <button
-            onClick={handleGenerate}
-            disabled={loading}
-            style={{
-              width: "100%",
-              padding: "14px",
-              background: "linear-gradient(135deg, #238636, #2ea043)",
-              color: "#fff",
-              border: "none",
-              borderRadius: "14px",
-              fontWeight: 800,
-              fontSize: "1.1rem",
-              cursor: "pointer",
-              fontFamily: "'Cairo', sans-serif",
-              opacity: loading ? 0.6 : 1,
-            }}
-          >
-            {loading ? "⏳ جاري التوليد..." : "توليد الحسابات"}
-          </button>
-
-          {/* عرض النتائج */}
-          {results.length > 0 && (
-            <div style={{ marginTop: "20px" }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "10px",
-                }}
-              >
-                <h3 style={{ color: "#00e5ff", fontSize: "1.1rem" }}>
-                  ✅ تم توليد {results.filter((r) => !r.error).length} حساب
-                </h3>
-                <button
-                  onClick={handleExport}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "24px" }}>
+            {sections
+              .filter((s) => s.allowed)
+              .map((section, i) => (
+                <motion.button
+                  key={section.id}
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                  whileHover={{ scale: 1.03, y: -6 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => router.push(section.href)}
                   style={{
-                    padding: "8px 16px",
-                    background: "rgba(0,229,255,0.1)",
-                    border: "1px solid #00e5ff",
-                    borderRadius: "8px",
-                    color: "#00e5ff",
+                    ...glassCard,
+                    padding: "35px 25px",
                     cursor: "pointer",
-                    fontFamily: "'Cairo', sans-serif",
-                    fontSize: "0.85rem",
+                    textAlign: "center",
+                    border: `1px solid ${section.color}33`,
+                    transition: "all 0.3s",
                   }}
                 >
-                  📥 تصدير CSV
-                </button>
-              </div>
-
-              <div style={{ maxHeight: "300px", overflow: "auto" }}>
-                <table
-                  style={{
-                    width: "100%",
-                    borderCollapse: "collapse",
-                    fontSize: "0.85rem",
-                  }}
-                >
-                  <thead>
-                    <tr
-                      style={{
-                        borderBottom: "1px solid rgba(255,255,255,0.1)",
-                      }}
-                    >
-                      <th
-                        style={{
-                          padding: "8px",
-                          color: "#8b949e",
-                          textAlign: "right",
-                        }}
-                      >
-                        الاسم
-                      </th>
-                      <th
-                        style={{
-                          padding: "8px",
-                          color: "#8b949e",
-                          textAlign: "right",
-                        }}
-                      >
-                        كود التفعيل
-                      </th>
-                      <th
-                        style={{
-                          padding: "8px",
-                          color: "#8b949e",
-                          textAlign: "right",
-                        }}
-                      >
-                        الحالة
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {results.map((r, i) => (
-                      <tr
-                        key={i}
-                        style={{
-                          borderBottom: "1px solid rgba(255,255,255,0.05)",
-                        }}
-                      >
-                        <td style={{ padding: "8px" }}>{r.name}</td>
-                        <td
-                          style={{
-                            padding: "8px",
-                            fontFamily: "'Orbitron', monospace",
-                            color: "#00e5ff",
-                            direction: "ltr",
-                            textAlign: "right",
-                          }}
-                        >
-                          {r.error ? "❌" : r.code}
-                        </td>
-                        <td style={{ padding: "8px" }}>
-                          {r.error ? (
-                            <span style={{ color: "#f85149" }}>فشل</span>
-                          ) : (
-                            <span style={{ color: "#2ea043" }}>✅</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      </main>
+                  <motion.div
+                    animate={{ y: [0, -10, 0] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                    style={{ fontSize: "3.5rem", marginBottom: "16px" }}
+                  >
+                    {section.icon}
+                  </motion.div>
+                  <h3 style={{ color: section.color, fontSize: "1.3rem", fontWeight: 800, marginBottom: "8px" }}>{section.title}</h3>
+                  <p style={{ color: "#8b949e", fontSize: "0.9rem", lineHeight: 1.6 }}>{section.desc}</p>
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: "60%" }}
+                    transition={{ delay: 0.5 + i * 0.1, duration: 0.8 }}
+                    style={{
+                      height: "3px",
+                      background: `linear-gradient(90deg, transparent, ${section.color}, transparent)`,
+                      margin: "15px auto 0",
+                      borderRadius: "2px",
+                    }}
+                  />
+                </motion.button>
+              ))}
+          </div>
+        </main>
       </PageTransition>
-
       <Footer />
     </div>
   );

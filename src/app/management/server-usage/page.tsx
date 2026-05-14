@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import PageTransition from "@/components/layout/PageTransition";
+import LoadingSkeleton from "@/components/ui/LoadingSkeleton";
 
 export default function ManagementServerUsagePage() {
   const router = useRouter();
@@ -56,9 +57,7 @@ export default function ManagementServerUsagePage() {
           <p className="text-[#8b949e] text-sm mb-8 text-center">مؤشرات الأداء وإحصائيات المنصة</p>
 
           {loading ? (
-            <div className="text-center py-20">
-              <div className="animate-spin w-10 h-10 border-2 border-[#00e5ff] border-t-transparent rounded-full mx-auto" />
-            </div>
+            <LoadingSkeleton variant="card" count={3} />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {statCards.map((card, i) => (
@@ -66,6 +65,7 @@ export default function ManagementServerUsagePage() {
                   key={i}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
+                  className="hover-glow"
                   transition={{ delay: i * 0.08 }}
                   style={{
                     ...glassCard,

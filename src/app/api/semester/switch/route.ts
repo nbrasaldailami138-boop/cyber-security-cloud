@@ -5,6 +5,34 @@ import { prisma } from "@/lib/prisma";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
 
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const level = searchParams.get("level");
+
+    if (!level || !["LEVEL_1", "LEVEL_2"].includes(level)) {
+      return NextResponse.json(
+        { success: false, message: "المستوى غير صالح" },
+        { status: 400 },
+      );
+    }
+
+    const config = await prisma.systemConfig.findUnique({
+      where: { key: `current_semester_${level}` },
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: { level, semester: config?.value || "TERM_1" },
+    });
+  } catch {
+    return NextResponse.json(
+      { success: false, message: "حدث خطأ" },
+      { status: 500 },
+    );
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const cookieStore = await cookies();

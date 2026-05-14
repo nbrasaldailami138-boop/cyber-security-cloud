@@ -38,4 +38,20 @@ export const uploadRateLimiter = new Ratelimit({
   prefix: "ratelimit:upload",
 });
 
+// 3 محاولات 2FA في الدقيقة
+export const twoFARateLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(3, "1 m"),
+  analytics: true,
+  prefix: "ratelimit:2fa",
+});
+
+// 3 تغييرات كلمة مرور في الساعة
+export const profileRateLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(3, "1 h"),
+  analytics: true,
+  prefix: "ratelimit:profile",
+});
+
 export default loginRateLimiter;

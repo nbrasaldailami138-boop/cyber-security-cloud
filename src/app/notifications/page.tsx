@@ -1,20 +1,13 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import PageTransition from "@/components/layout/PageTransition";
-
-interface Notification {
-  id: string;
-  type: string;
-  title: string;
-  body: string;
-  linkUrl: string | null;
-  isRead: boolean;
-  createdAt: string;
-}
+import { useAuth } from "@/hooks/useAuth";
+import { csrfFetch } from "@/lib/csrfClient";
+import { useNotificationStore } from "@/store/notificationStore";
 
 const typeIcons: Record<string, string> = {
   NEW_MESSAGE: "💬",
@@ -40,16 +33,53 @@ const timeAgo = (date: string) => {
 };
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const {
+    notifications,
+    unreadCount,
+    isLoading,
+    setNotifications,
+    addNotification,
+    markAsRead,
+    markAllAsRead,
+  } = useNotificationStore();
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const { user } = useAuth();
+  const pathname = "/notifications";
 
   useEffect(() => {
     fetchNotifications();
   }, [page]);
+
+  // استقبال الإشعارات الفورية عبر Pusher
+  useEffect(() => {
+    if (!user?.id) return;
+    let unsubscribe: (() => void) | undefined;
+
+    const setupPusher = async () => {
+      const PusherClient = (await import("pusher-js")).default;
+      const pusher = new PusherClient(
+        process.env.NEXT_PUBLIC_PUSHER_KEY || "",
+        { cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || "eu" },
+      );
+
+      const channel = pusher.subscribe(`user-${user.id}`);
+      channel.bind("notification", (data: any) => {
+        addNotification(data);
+      });
+
+      unsubscribe = () => {
+        channel.unbind("notification");
+        pusher.unsubscribe(`user-${user.id}`);
+        pusher.disconnect();
+      };
+    };
+
+    setupPusher();
+    return () => unsubscribe?.();
+  }, [user?.id]);
 
   const fetchNotifications = async () => {
     setLoading(true);
@@ -57,40 +87,40 @@ export default function NotificationsPage() {
       const res = await fetch(`/api/notifications/list?page=${page}&limit=20`);
       const data = await res.json();
       if (data.success) {
-        setNotifications((prev) => (page === 1 ? data.data : [...prev, ...data.data]));
+        if (page === 1) {
+          setNotifications(data.data);
+        } else {
+          data.data.forEach((n: any) => addNotification(n));
+        }
         setTotal(data.total);
-        setUnreadCount(data.unreadCount);
       }
-    } catch { } finally {
+    } catch {
+    } finally {
       setLoading(false);
     }
   };
 
   const handleMarkRead = async (id: string, linkUrl: string | null) => {
     try {
-      await fetch("/api/notifications/mark-read", {
+      await csrfFetch("/api/notifications/mark-read", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notificationId: id }),
       });
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
-      );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
+      markAsRead(id);
       if (linkUrl) router.push(linkUrl);
-    } catch { }
+    } catch {}
   };
 
   const handleMarkAllRead = async () => {
     try {
-      await fetch("/api/notifications/mark-read", {
+      await csrfFetch("/api/notifications/mark-read", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ all: true }),
       });
-      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-      setUnreadCount(0);
-    } catch { }
+      markAllAsRead();
+    } catch {}
   };
 
   const loadMore = () => {
@@ -98,77 +128,198 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#010204", fontFamily: "'Cairo', sans-serif", color: "#fff" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#010204",
+        fontFamily: "'Cairo', sans-serif",
+        color: "#fff",
+      }}
+    >
       <Header />
       <Sidebar />
       <PageTransition>
-      <main style={{ padding: "100px 20px 60px", maxWidth: "900px", margin: "0 auto" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "25px", flexWrap: "wrap", gap: "10px" }}>
-          <h2 style={{ color: "#00e5ff", fontSize: "1.8rem", fontWeight: 800 }}>
-            🔔 سجل الإشعارات {unreadCount > 0 && <span style={{ color: "#f0883e", fontSize: "1rem" }}>({unreadCount} غير مقروء)</span>}
-          </h2>
-          {unreadCount > 0 && (
-            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleMarkAllRead}
-              style={{ padding: "10px 20px", background: "rgba(0,229,255,0.1)", border: "1px solid #00e5ff", borderRadius: "10px", color: "#00e5ff", cursor: "pointer", fontFamily: "'Cairo', sans-serif", fontWeight: 700 }}>
-              تحديد الكل كمقروء
-            </motion.button>
-          )}
-        </div>
+        <main
+          style={{
+            padding: "100px 20px 60px",
+            maxWidth: "900px",
+            margin: "0 auto",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "25px",
+              flexWrap: "wrap",
+              gap: "10px",
+            }}
+          >
+            <h2
+              style={{ color: "#00e5ff", fontSize: "1.8rem", fontWeight: 800 }}
+            >
+              🔔 سجل الإشعارات{" "}
+              {unreadCount > 0 && (
+                <span style={{ color: "#f0883e", fontSize: "1rem" }}>
+                  ({unreadCount} غير مقروء)
+                </span>
+              )}
+            </h2>
+            {unreadCount > 0 && (
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleMarkAllRead}
+                style={{
+                  padding: "10px 20px",
+                  background: "rgba(0,229,255,0.1)",
+                  border: "1px solid #00e5ff",
+                  borderRadius: "10px",
+                  color: "#00e5ff",
+                  cursor: "pointer",
+                  fontFamily: "'Cairo', sans-serif",
+                  fontWeight: 700,
+                }}
+              >
+                تحديد الكل كمقروء
+              </motion.button>
+            )}
+          </div>
 
-        {notifications.length === 0 && !loading && (
-          <p style={{ textAlign: "center", color: "#8b949e", marginTop: "50px", fontSize: "1.1rem" }}>
-            📭 لا توجد إشعارات
-          </p>
-        )}
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-          {notifications.map((notif) => (
-            <motion.div
-              key={notif.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              whileHover={{ scale: 1.01 }}
-              onClick={() => handleMarkRead(notif.id, notif.linkUrl)}
+          {notifications.length === 0 && !loading && (
+            <p
               style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: "15px",
-                padding: "18px",
-                borderRadius: "14px",
-                cursor: "pointer",
-                background: notif.isRead ? "rgba(22,27,34,0.4)" : "rgba(0,229,255,0.06)",
-                border: notif.isRead ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(0,229,255,0.2)",
-                transition: "all 0.3s",
+                textAlign: "center",
+                color: "#8b949e",
+                marginTop: "50px",
+                fontSize: "1.1rem",
               }}
             >
-              <span style={{ fontSize: "1.8rem", flexShrink: 0 }}>{typeIcons[notif.type] || "🔔"}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
-                  <h4 style={{ fontWeight: 700, fontSize: "0.95rem", color: notif.isRead ? "#8b949e" : "#fff", margin: 0 }}>
-                    {notif.title}
-                  </h4>
-                  <span style={{ fontSize: "0.75rem", color: "#8b949e", whiteSpace: "nowrap" }}>{timeAgo(notif.createdAt)}</span>
+              📭 لا توجد إشعارات
+            </p>
+          )}
+
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "12px" }}
+          >
+            {notifications.map((notif) => (
+              <motion.div
+                key={notif.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                whileHover={{ scale: 1.01 }}
+                onClick={() => handleMarkRead(notif.id, notif.linkUrl)}
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "15px",
+                  padding: "18px",
+                  borderRadius: "14px",
+                  cursor: "pointer",
+                  background: notif.isRead
+                    ? "rgba(22,27,34,0.4)"
+                    : "rgba(0,229,255,0.06)",
+                  border: notif.isRead
+                    ? "1px solid rgba(255,255,255,0.05)"
+                    : "1px solid rgba(0,229,255,0.2)",
+                  transition: "all 0.3s",
+                }}
+              >
+                <span style={{ fontSize: "1.8rem", flexShrink: 0 }}>
+                  {typeIcons[notif.type] || "🔔"}
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: "10px",
+                    }}
+                  >
+                    <h4
+                      style={{
+                        fontWeight: 700,
+                        fontSize: "0.95rem",
+                        color: notif.isRead ? "#8b949e" : "#fff",
+                        margin: 0,
+                      }}
+                    >
+                      {notif.title}
+                    </h4>
+                    <span
+                      style={{
+                        fontSize: "0.75rem",
+                        color: "#8b949e",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {timeAgo(notif.createdAt)}
+                    </span>
+                  </div>
+                  <p
+                    style={{
+                      color: "#8b949e",
+                      fontSize: "0.85rem",
+                      margin: "4px 0 0",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {notif.body}
+                  </p>
                 </div>
-                <p style={{ color: "#8b949e", fontSize: "0.85rem", margin: "4px 0 0", lineHeight: 1.5 }}>{notif.body}</p>
-              </div>
-              {!notif.isRead && (
-                <span style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#00e5ff", flexShrink: 0, marginTop: "6px", boxShadow: "0 0 8px #00e5ff" }} />
-              )}
-            </motion.div>
-          ))}
-        </div>
-
-        {loading && <p style={{ textAlign: "center", color: "#8b949e", marginTop: "20px" }}>⏳ جاري التحميل...</p>}
-
-        {notifications.length < total && !loading && (
-          <div style={{ textAlign: "center", marginTop: "25px" }}>
-            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={loadMore}
-              style={{ padding: "12px 30px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", color: "#8b949e", cursor: "pointer", fontFamily: "'Cairo', sans-serif", fontWeight: 600 }}>
-              عرض المزيد
-            </motion.button>
+                {!notif.isRead && (
+                  <span
+                    style={{
+                      width: "10px",
+                      height: "10px",
+                      borderRadius: "50%",
+                      background: "#00e5ff",
+                      flexShrink: 0,
+                      marginTop: "6px",
+                      boxShadow: "0 0 8px #00e5ff",
+                    }}
+                  />
+                )}
+              </motion.div>
+            ))}
           </div>
-        )}
-      </main>
+
+          {loading && (
+            <p
+              style={{
+                textAlign: "center",
+                color: "#8b949e",
+                marginTop: "20px",
+              }}
+            >
+              ⏳ جاري التحميل...
+            </p>
+          )}
+
+          {notifications.length < total && !loading && (
+            <div style={{ textAlign: "center", marginTop: "25px" }}>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={loadMore}
+                style={{
+                  padding: "12px 30px",
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: "10px",
+                  color: "#8b949e",
+                  cursor: "pointer",
+                  fontFamily: "'Cairo', sans-serif",
+                  fontWeight: 600,
+                }}
+              >
+                عرض المزيد
+              </motion.button>
+            </div>
+          )}
+        </main>
       </PageTransition>
     </div>
   );

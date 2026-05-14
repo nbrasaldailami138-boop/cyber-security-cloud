@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies();
@@ -20,7 +22,11 @@ export async function GET(request: NextRequest) {
     const userId = payload.sub as string;
     const userRole = payload.role as string;
 
-    if (userRole !== "TEACHER") {
+    if (
+      userRole !== "TEACHER" &&
+      userRole !== "ADMIN" &&
+      userRole !== "MANAGEMENT"
+    ) {
       return NextResponse.json(
         { success: false, message: "غير مصرح" },
         { status: 403 },
@@ -29,31 +35,35 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
-    const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "20")));
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(searchParams.get("limit") || "20")),
+    );
     const subjectId = searchParams.get("subjectId");
-
-    const teachingSubjectIds = await prisma.subject.findMany({
-      where: { teacherId: userId, deletedAt: null },
-      select: { id: true },
-    });
-    const ids = teachingSubjectIds.map((s) => s.id);
-
-    if (ids.length === 0) {
-      return NextResponse.json({
-        success: true,
-        data: [],
-        total: 0,
-        page,
-        limit,
-        totalPages: 0,
-      });
-    }
 
     const where: any = {
       status: "evaluated",
-      subjectId: { in: ids },
       deletedAt: null,
     };
+
+    if (userRole === "TEACHER") {
+      const teachingSubjectIds = await prisma.subject.findMany({
+        where: { teacherId: userId, deletedAt: null },
+        select: { id: true },
+      });
+      const ids = teachingSubjectIds.map((s) => s.id);
+      if (ids.length === 0) {
+        return NextResponse.json({
+          success: true,
+          data: [],
+          total: 0,
+          page,
+          limit,
+          totalPages: 0,
+        });
+      }
+      where.subjectId = { in: ids };
+    }
 
     if (subjectId) {
       where.subjectId = subjectId;

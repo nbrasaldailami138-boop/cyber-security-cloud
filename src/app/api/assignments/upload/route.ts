@@ -4,6 +4,8 @@ import { jwtVerify } from "jose";
 import { prisma } from "@/lib/prisma";
 import { imagekit } from "@/lib/imagekit";
 import { APP_CONFIG } from "@/config";
+import { triggerNotification } from "@/lib/pusherService";
+import { scanAndReject } from "@/lib/clamav";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
 
@@ -100,6 +102,15 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
+    // فحص الفيروسات
+    const infected = await scanAndReject(buffer, file.name, userId);
+    if (infected) {
+      return NextResponse.json(
+        { success: false, message: "الملف مصاب بفيروس! تم رفض الرفع." },
+        { status: 400 },
+      );
+    }
+
     const uploadResponse = await imagekit.upload({
       file: buffer.toString("base64"),
       fileName: `${Date.now()}-${file.name}`,
@@ -119,7 +130,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (subject.teacherId) {
-      await prisma.notification.create({
+      const notif = await prisma.notification.create({
         data: {
           userId: subject.teacherId,
           type: "NEW_ASSIGNMENT",
@@ -127,6 +138,15 @@ export async function POST(request: NextRequest) {
           body: `تم استلام تكليف جديد في مادة ${subject.name}`,
           linkUrl: "/teacher/assignments",
         },
+      });
+
+      // إشعار فوري عبر Pusher
+      await triggerNotification(subject.teacherId, {
+        id: notif.id,
+        type: "NEW_ASSIGNMENT",
+        title: "تكليف جديد",
+        body: `تم استلام تكليف جديد في مادة ${subject.name}`,
+        linkUrl: "/teacher/assignments",
       });
     }
 

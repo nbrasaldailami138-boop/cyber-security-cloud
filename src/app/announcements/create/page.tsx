@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import PageTransition from "@/components/layout/PageTransition";
+import { csrfFetch } from "@/lib/csrfClient";
 
 export default function CreateAnnouncementPage() {
   const [title, setTitle] = useState("");
@@ -32,7 +33,7 @@ export default function CreateAnnouncementPage() {
     }
     setSubmitting(true);
     try {
-      const res = await fetch("/api/announcements/create", {
+      const res = await csrfFetch("/api/announcements/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: title.trim(), description: description.trim(), level }),

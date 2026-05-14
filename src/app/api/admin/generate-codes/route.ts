@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { prisma } from "@/lib/prisma";
 import { generateSecureToken, hashToken } from "@/lib/security";
+import { pusher } from "@/lib/pusher";
 import { z } from "zod";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
@@ -60,27 +61,15 @@ export async function POST(request: NextRequest) {
       // تاريخ انتهاء الصلاحية (30 يوم)
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-      let email = "";
-      let displayName = trimmedName;
-
-      // إذا كان معلماً مع مادة
-      if (role === "TEACHER" && subjectName) {
-        email = `teacher.${trimmedName.replace(/\s+/g, ".").toLowerCase()}@cybersec.edu`;
-        displayName = `${trimmedName} (${subjectName})`;
-      } else if (role === "TEACHER") {
-        email = `teacher.${trimmedName.replace(/\s+/g, ".").toLowerCase()}@cybersec.edu`;
-      } else if (role === "MANAGEMENT") {
-        email = `mgmt.${trimmedName.replace(/\s+/g, ".").toLowerCase()}@cybersec.edu`;
-      } else {
-        email = `student.${trimmedName.replace(/\s+/g, ".").toLowerCase()}@cybersec.edu`;
-      }
+      const displayName = trimmedName;
+      const placeholderEmail = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@temp.local`;
 
       try {
         // إنشاء المستخدم
         const user = await prisma.user.create({
           data: {
             name: displayName,
-            email,
+            email: placeholderEmail,
             passwordHash: "", // سيتم تعيينها عند التفعيل
             role,
             level,
@@ -123,16 +112,17 @@ export async function POST(request: NextRequest) {
 
         results.push({
           name: displayName,
-          email,
           code: activationCode,
           role,
           level,
           subject: subjectName || null,
+          success: true,
         });
       } catch (err: any) {
         results.push({
           name: trimmedName,
           error: err.message || "فشل الإنشاء",
+          success: false,
         });
       }
     }
@@ -149,6 +139,19 @@ export async function POST(request: NextRequest) {
         metadata: { role, count: results.length },
       },
     });
+
+    // إرسال إشعار لحظي عبر Pusher
+    try {
+      await pusher.trigger("generation-channel", "accounts-generated", {
+        count: results.filter((r) => !r.error).length,
+        role,
+        level,
+        timestamp: new Date().toISOString(),
+        generatedBy: payload.name || payload.sub,
+      });
+    } catch (e) {
+      // فشل الإشعار لا يوقف العملية
+    }
 
     return NextResponse.json({
       status: "success",

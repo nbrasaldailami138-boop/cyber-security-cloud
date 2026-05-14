@@ -6,6 +6,7 @@ import Footer from "@/components/layout/Footer";
 import Sidebar from "@/components/layout/Sidebar";
 import { useToast } from "@/components/ui/Toast";
 import PageTransition from "@/components/layout/PageTransition";
+import { csrfFetch } from "@/lib/csrfClient";
 
 export default function UpgradePage() {
   const [email, setEmail] = useState("");
@@ -16,7 +17,7 @@ export default function UpgradePage() {
     if (!email) return showToast("أدخل البريد الإلكتروني", "warning");
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/upgrade", {
+      const res = await csrfFetch("/api/admin/upgrade", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),

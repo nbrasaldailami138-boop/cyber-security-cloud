@@ -18,19 +18,27 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false }, { status: 403 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20")));
+
     const where: any = {};
     if (payload.role === "MANAGEMENT" && payload.level) {
       where.level = payload.level as string;
     }
 
-    const logs = await prisma.auditLog.findMany({
-      where,
-      include: { user: { select: { name: true, role: true } } },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-    });
+    const [logs, total] = await Promise.all([
+      prisma.auditLog.findMany({
+        where,
+        include: { user: { select: { name: true, role: true } } },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.auditLog.count({ where }),
+    ]);
 
-    return NextResponse.json({ success: true, data: logs });
+    return NextResponse.json({ success: true, data: logs, total, page, limit });
   } catch (error) {
     return NextResponse.json({ success: false }, { status: 500 });
   }

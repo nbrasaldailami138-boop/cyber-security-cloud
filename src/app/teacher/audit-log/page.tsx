@@ -6,11 +6,15 @@ import { motion } from "framer-motion";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import PageTransition from "@/components/layout/PageTransition";
+import Pagination from "@/components/ui/Pagination";
+import { usePagination } from "@/hooks/usePagination";
 
 export default function TeacherAuditLogPage() {
   const router = useRouter();
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const pag = usePagination(1, 20);
 
   useEffect(() => {
     const role = localStorage.getItem("userRole");
@@ -19,13 +23,16 @@ export default function TeacherAuditLogPage() {
       return;
     }
     fetchLogs();
-  }, []);
+  }, [pag.page]);
 
   const fetchLogs = async () => {
     try {
-      const res = await fetch("/api/admin/audit-log?limit=50");
+      const res = await fetch(`/api/admin/audit-log?page=${pag.page}&limit=${pag.limit}`);
       const data = await res.json();
-      if (data.success) setLogs(data.data || []);
+      if (data.success) {
+        setLogs(data.data || []);
+        pag.setTotal(data.total || 0);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -142,6 +149,7 @@ export default function TeacherAuditLogPage() {
                   </tbody>
                 </table>
               </div>
+              <Pagination page={pag.page} totalPages={pag.totalPages} onPageChange={pag.goTo} />
             </div>
           )}
         </motion.div>

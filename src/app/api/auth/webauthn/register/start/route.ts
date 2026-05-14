@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { verifyAccessToken } from "@/lib/auth";
-import { generateRegistrationOpts } from "@/lib/webauthn";
 import { jwtVerify } from "jose";
+import { generateRegistrationOpts } from "@/lib/webauthn";
+import { prisma } from "@/lib/prisma";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
 
@@ -22,10 +22,15 @@ export async function POST(request: NextRequest) {
     const userId = payload.sub as string;
     const userEmail = payload.email as string;
 
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true },
+    });
+
     const options = await generateRegistrationOpts(
       userId,
       userEmail,
-      payload.email as string,
+      user?.name || userEmail,
     );
 
     return NextResponse.json({ success: true, options });

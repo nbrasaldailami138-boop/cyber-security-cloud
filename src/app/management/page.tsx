@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import PageTransition from "@/components/layout/PageTransition";
+import LoadingSkeleton from "@/components/ui/LoadingSkeleton";
 
 export default function ManagementDashboard() {
   const router = useRouter();
@@ -58,10 +59,7 @@ export default function ManagementDashboard() {
           </p>
 
           {loading ? (
-            <div className="text-center py-20">
-              <div className="animate-spin w-10 h-10 border-2 border-[#00e5ff] border-t-transparent rounded-full mx-auto" />
-              <p className="text-[#8b949e] mt-4">جاري تحميل البيانات...</p>
-            </div>
+            <LoadingSkeleton variant="card" count={4} />
           ) : (
             <>
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
@@ -72,6 +70,7 @@ export default function ManagementDashboard() {
                   { label: "التكاليف المرفوعة", value: stats?.totalAssignments || 0, color: "#bf5af2" },
                 ].map((card, i) => (
                   <motion.div
+                    className="hover-glow"
                     key={i}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}

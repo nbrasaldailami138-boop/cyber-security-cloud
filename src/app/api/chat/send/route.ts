@@ -2,11 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { prisma } from "@/lib/prisma";
+import { encryptMessage } from "@/lib/crypto";
+import DOMPurify from "dompurify";
+import { JSDOM } from "jsdom";
 import { messageRateLimiter } from "@/lib/ratelimit";
+import { triggerNewMessage, triggerNotification } from "@/lib/pusherService";
+import { sendPushNotification } from "@/lib/pushNotifications";
 import { z } from "zod";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
-
+const window = new JSDOM("").window;
+const purify = DOMPurify(window as any);
 const messageSchema = z.object({
   receiverId: z.string().min(1, "المستقبل مطلوب"),
   body: z.string().min(1, "الرسالة فارغة").max(2000, "الرسالة طويلة جداً"),
@@ -45,7 +51,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { receiverId, body: messageBody } = validation.data;
+    let { receiverId, body: messageBody } = validation.data;
+
+    // تعقيم الرسالة من XSS
+    messageBody = purify.sanitize(messageBody, { ALLOWED_TAGS: [] });
 
     // التحقق من صلاحية المراسلة (العزل الأكاديمي)
     const sender = await prisma.user.findUnique({ where: { id: senderId } });
@@ -60,24 +69,67 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // العزل الأكاديمي
-    if (sender.role === "STUDENT" && receiver.role === "STUDENT") {
+    // التحقق من الحظر
+    const isBlocked = await prisma.message.findFirst({
+      where: {
+        OR: [
+          { senderId: receiverId, receiverId: senderId, isBlocked: true },
+          { senderId: senderId, receiverId: receiverId, isBlocked: true },
+        ],
+      },
+    });
+    if (isBlocked) {
       return NextResponse.json(
-        { success: false, message: "لا يمكنك مراسلة طالب آخر" },
+        { success: false, message: "لا يمكنك مراسلة هذا المستخدم" },
         { status: 403 },
       );
     }
+
+    // العزل الأكاديمي
+    if (sender.role === "STUDENT") {
+      if (receiver.role === "STUDENT") {
+        return NextResponse.json(
+          { success: false, message: "لا يمكنك مراسلة طالب آخر" },
+          { status: 403 },
+        );
+      }
+      if (receiver.role === "TEACHER" || receiver.role === "MANAGEMENT") {
+        if (receiver.level !== sender.level) {
+          return NextResponse.json(
+            { success: false, message: "لا يمكنك مراسلة معلمين من مستوى آخر" },
+            { status: 403 },
+          );
+        }
+      }
+    }
+
+    if (sender.role === "TEACHER" && receiver.role === "TEACHER") {
+      return NextResponse.json(
+        { success: false, message: "لا يمكنك مراسلة معلم آخر" },
+        { status: 403 },
+      );
+    }
+
+    // تشفير الرسالة
+    const encryptedBody = encryptMessage(messageBody);
 
     const message = await prisma.message.create({
       data: {
         senderId,
         receiverId,
-        body: messageBody,
+        body: encryptedBody,
+        encrypted: true,
       },
     });
 
+    // تحديث آخر ظهور للمرسل
+    await prisma.user.update({
+      where: { id: senderId },
+      data: { lastSeenAt: new Date() },
+    });
+
     // إنشاء إشعار
-    await prisma.notification.create({
+    const notification = await prisma.notification.create({
       data: {
         userId: receiverId,
         type: "NEW_MESSAGE",
@@ -86,6 +138,28 @@ export async function POST(request: NextRequest) {
         linkUrl: "/chat",
       },
     });
+
+    // إرسال إشعار فوري عبر Pusher
+    await triggerNewMessage(senderId, receiverId, {
+      id: message.id,
+      body: messageBody,
+      createdAt: message.createdAt.toISOString(),
+      sender: { id: senderId, name: sender.name },
+    });
+    await triggerNotification(receiverId, {
+      id: notification.id,
+      type: "NEW_MESSAGE",
+      title: "رسالة جديدة",
+      body: `رسالة جديدة من ${sender.name}`,
+      linkUrl: "/chat",
+    });
+    // إرسال Push Notification خارجي
+    await sendPushNotification(
+      receiverId,
+      "💬 رسالة جديدة",
+      `رسالة جديدة من ${sender.name}`,
+      "/chat",
+    );
 
     return NextResponse.json({
       success: true,

@@ -178,13 +178,13 @@ RootLayout
 - [x] إضافة loading skeletons أو spinners مخصصة — `LoadingSkeleton` component
 - [x] تحسين ScanLine (ألوان متعددة + سرعة متغيرة)
 
-**Phase 2 — تحسين الكرة الأرضية (CyberGlobe)**
-- [ ] إضافة خطوط ربط بين النقاط (connecting lines)
-- [ ] دوران تفاعلي مع الماوس (Drag to rotate)
-- [ ] نقاط مضيئة متحركة (pulsing nodes)
-- [ ] إضاءة ديناميكية متعددة الألوان
-- [ ] جزيئات عائمة حول الكرة (floating particles field)
-- [ ] Zoom بطيء تلقائي
+**Phase 2 — تحسين الكرة الأرضية (CyberGlobe) ✅**
+- [x] إضافة خطوط ربط بين النقاط (connecting lines) — شبكة ثلاثية الأبعاد بين النقاط المتقاربة
+- [x] دوران تفاعلي مع الماوس (Drag to rotate) — OrbitControls مع auto-rotate
+- [x] نقاط مضيئة متحركة (pulsing nodes) — نبض متغير السرعة حسب الوقت
+- [x] إضاءة ديناميكية متعددة الألوان — أضواء orbit + ألوان متغيرة للنقاط
+- [x] جزيئات عائمة حول الكرة (floating particles field) — 400 جسيم عائم
+- [x] Zoom بطيء تلقائي — camera breathing مع auto-rotate
 
 **Phase 3 — CAPTCHA Protection**
 - [ ] إضافة Google reCAPTCHA v3 أو hCaptcha

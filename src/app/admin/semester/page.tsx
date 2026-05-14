@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { csrfFetch } from "@/lib/csrfClient";
 import { motion } from "framer-motion";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
@@ -48,7 +49,7 @@ export default function SemesterManagementPage() {
     setSwitching(level);
     setMessage("");
     try {
-      const res = await fetch("/api/semester/switch", {
+      const res = await csrfFetch("/api/semester/switch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ level, semester: newSemester }),
