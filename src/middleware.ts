@@ -151,9 +151,11 @@ export async function middleware(request: NextRequest) {
     const isAdminPath = adminPaths.some((p) => pathname.startsWith(p));
     const isAllowedManagementPath =
       effectiveRole === "MANAGEMENT" &&
-      (pathname.startsWith("/admin/generation/students") ||
-        pathname.startsWith("/admin/generation/subjects") ||
-        pathname === "/admin/generation");
+      (pathname.startsWith("/admin/generation") ||
+        pathname.startsWith("/admin/promotions") ||
+        pathname.startsWith("/admin/server-usage") ||
+        pathname.startsWith("/admin/activated-accounts") ||
+        pathname.startsWith("/admin/audit-log"));
 
     if (isAdminPath && effectiveRole !== "ADMIN" && !isAllowedManagementPath) {
       return NextResponse.redirect(new URL("/login", request.url));

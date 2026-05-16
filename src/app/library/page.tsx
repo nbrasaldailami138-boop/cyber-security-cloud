@@ -285,11 +285,12 @@ export default function LibraryPage() {
 
   // ==================== تحميل المواد ====================
   const loadSubjects = useCallback(async () => {
+    if (!userLevel) return;
     try {
       const res = await fetch(`/api/subjects/active?level=${userLevel}`);
       const data = await res.json();
-      if (data.success) {
-        setSubjects(data.data || []);
+      if (data.success && data.data?.length) {
+        setSubjects(data.data);
       }
     } catch {
       // صامت
@@ -508,6 +509,17 @@ export default function LibraryPage() {
       }
     }
   }, [uploadYoutubeUrl]);
+
+  useEffect(() => {
+    if (userRole === "ADMIN" && uploadTargetLevel) {
+      fetch(`/api/subjects/active?level=${uploadTargetLevel}`)
+        .then((r) => r.json())
+        .then((res) => {
+          if (res.success) setSubjects(res.data || []);
+        })
+        .catch(() => {});
+    }
+  }, [uploadTargetLevel, userRole]);
 
   // ==================== أدوات العرض ====================
   const getTypeIcon = (type: string): string => {
@@ -747,6 +759,7 @@ export default function LibraryPage() {
                   whileTap={{ scale: 0.95 }}
                   onClick={() => {
                     resetUploadForm();
+                    loadSubjects();
                     setShowUploadModal(true);
                   }}
                   style={{
@@ -1394,30 +1407,86 @@ export default function LibraryPage() {
                 >
                   <label
                     style={{
-                      color: "#8b949e",
+                      color: "#bf5af2",
                       fontSize: "0.85rem",
                       marginBottom: "8px",
                       display: "block",
+                      textAlign: "center",
+                      fontWeight: 600,
                     }}
                   >
-                    اختر المادة الدراسية
+                    📘 اختر المادة الدراسية
                   </label>
-                  <select
-                    value={uploadSubjectId}
-                    onChange={(e) => setUploadSubjectId(e.target.value)}
-                    style={{
-                      ...inputStyle,
-                      appearance: "none",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <option value="">-- اختر المادة --</option>
-                    {subjects.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.code})
-                      </option>
-                    ))}
-                  </select>
+                  {subjects.length === 0 ? (
+                    <div
+                      style={{
+                        ...inputStyle,
+                        textAlign: "center",
+                        color: "#f85149",
+                        background: "rgba(248,81,73,0.1)",
+                        border: "1px solid rgba(248,81,73,0.2)",
+                      }}
+                    >
+                      ⚠️ لا توجد مواد متاحة
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "6px",
+                        maxHeight: "200px",
+                        overflowY: "auto",
+                        padding: "4px",
+                      }}
+                    >
+                      {subjects.map((s) => (
+                        <motion.button
+                          key={s.id}
+                          type="button"
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => setUploadSubjectId(s.id)}
+                          style={{
+                            width: "100%",
+                            padding: "12px",
+                            borderRadius: "12px",
+                            background:
+                              uploadSubjectId === s.id
+                                ? "rgba(191,90,242,0.15)"
+                                : "rgba(255,255,255,0.03)",
+                            border:
+                              uploadSubjectId === s.id
+                                ? "1px solid #bf5af2"
+                                : "1px solid rgba(255,255,255,0.08)",
+                            color:
+                              uploadSubjectId === s.id ? "#bf5af2" : "#e6edf3",
+                            cursor: "pointer",
+                            fontFamily: "'Cairo', sans-serif",
+                            fontWeight: 600,
+                            fontSize: "0.9rem",
+                            textAlign: "center",
+                            transition: "all 0.2s",
+                          }}
+                        >
+                          <span style={{ fontSize: "1rem", marginLeft: "6px" }}>
+                            📘
+                          </span>
+                          {s.name}
+                          <span
+                            style={{
+                              display: "block",
+                              fontSize: "0.7rem",
+                              color: "#8b949e",
+                              marginTop: "2px",
+                            }}
+                          >
+                            {s.code}
+                          </span>
+                        </motion.button>
+                      ))}
+                    </div>
+                  )}
                 </motion.div>
               )}
 

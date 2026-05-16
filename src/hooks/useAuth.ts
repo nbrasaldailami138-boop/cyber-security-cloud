@@ -18,7 +18,8 @@ export function useAuth() {
     isManagement: user?.role === "MANAGEMENT",
     isTeacher: user?.role === "TEACHER",
     isStudent: user?.role === "STUDENT",
-    managementLevel: (user as any)?.managementLevel || null,
+    managementLevel:
+      user?.role !== "ADMIN" ? (user as any)?.managementLevel || null : null,
     logout,
   };
 }

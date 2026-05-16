@@ -29,9 +29,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const levelFilter = userRole === "MANAGEMENT" && userLevel
-      ? { level: userLevel as any }
-      : {};
+    const userFilter =
+      userRole === "MANAGEMENT" && userLevel ? { level: userLevel as any } : {};
 
     const [
       totalUsers,
@@ -42,15 +41,19 @@ export async function GET(request: NextRequest) {
       totalContent,
       totalSubjects,
     ] = await Promise.all([
-      prisma.user.count({ where: { ...levelFilter, deletedAt: null } }),
-      prisma.user.count({ where: { ...levelFilter, status: "ACTIVE", deletedAt: null } }),
-      prisma.user.count({ where: { ...levelFilter, status: "PENDING", deletedAt: null } }),
-      prisma.assignment.count({ where: { ...levelFilter, deletedAt: null } }),
-      prisma.assignment.count({
-        where: { ...levelFilter, grade: { not: null }, deletedAt: null },
+      prisma.user.count({ where: { ...userFilter, deletedAt: null } }),
+      prisma.user.count({
+        where: { ...userFilter, status: "ACTIVE", deletedAt: null },
       }),
-      prisma.content.count({ where: { ...levelFilter, deletedAt: null } }),
-      prisma.subject.count({ where: { ...levelFilter, deletedAt: null } }),
+      prisma.user.count({
+        where: { ...userFilter, status: "PENDING", deletedAt: null },
+      }),
+      prisma.assignment.count({ where: { deletedAt: null } }),
+      prisma.assignment.count({
+        where: { grade: { not: null }, deletedAt: null },
+      }),
+      prisma.content.count({ where: { deletedAt: null } }),
+      prisma.subject.count({ where: { ...userFilter, deletedAt: null } }),
     ]);
 
     return NextResponse.json({

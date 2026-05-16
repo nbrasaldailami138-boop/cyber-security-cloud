@@ -81,7 +81,14 @@ const allMenuItems: MenuItem[] = [
     label: "استهلاك السيرفر",
     icon: "💻",
     path: "/admin/server-usage",
-    roles: ["ADMIN", "MANAGEMENT"],
+    roles: ["ADMIN"],
+    color: "#39ff14",
+  },
+  {
+    label: "استهلاك السيرفر",
+    icon: "💻",
+    path: "/management/server-usage",
+    roles: ["MANAGEMENT"],
     color: "#39ff14",
   },
   {
@@ -361,7 +368,7 @@ export default function Sidebar() {
                 {getLevelLabel(userLevel)}
               </span>
             )}
-            {managementLevel && (
+            {managementLevel && userRole !== "ADMIN" && (
               <motion.span
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}

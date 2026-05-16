@@ -740,6 +740,27 @@ export default function StudentDashboard() {
                       </motion.span>
                     </motion.div>
                   </div>
+                  <div
+                    style={{
+                      marginBottom: "12px",
+                      padding: "10px 14px",
+                      borderRadius: "10px",
+                      background: "rgba(255,202,40,0.08)",
+                      border: "1px solid rgba(255,202,40,0.2)",
+                      textAlign: "center",
+                    }}
+                  >
+                    <p
+                      style={{
+                        color: "#ffca28",
+                        fontSize: "0.8rem",
+                        margin: 0,
+                        fontWeight: 600,
+                      }}
+                    >
+                      ⚠️ قبل رفع التكليف، قم بتسمية ملف التكليف باسمك
+                    </p>
+                  </div>
 
                   {/* رفع الملف */}
                   <div style={{ marginBottom: "20px" }}>

@@ -160,7 +160,7 @@ export default function Header() {
                 margin: 0,
               }}
             >
-              جامعة ذمار - كلية الحاسبات
+              - كلية الأمن السيبراني
             </h1>
             <p
               style={{

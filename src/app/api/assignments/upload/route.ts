@@ -102,7 +102,6 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    // فحص الفيروسات
     const infected = await scanAndReject(buffer, file.name, userId);
     if (infected) {
       return NextResponse.json(
@@ -111,10 +110,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // اسم آمن للمجلد
+    const safeSubjectName =
+      subject.name.replace(/\s+/g, "-").replace(/[^\w\-\u0621-\u064A]/g, "") ||
+      subject.code;
+    const folder = `/level-${userLevel.replace("LEVEL_", "")}/assignments/${safeSubjectName}`;
+
     const uploadResponse = await imagekit.upload({
       file: buffer.toString("base64"),
       fileName: `${Date.now()}-${file.name}`,
-      folder: `/level-${userLevel}/assignments`,
+      folder,
     });
 
     const assignment = await prisma.assignment.create({
@@ -140,7 +145,6 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // إشعار فوري عبر Pusher
       await triggerNotification(subject.teacherId, {
         id: notif.id,
         type: "NEW_ASSIGNMENT",

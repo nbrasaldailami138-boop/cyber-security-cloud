@@ -1,135 +1,524 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Header from "@/components/layout/Header";
+import Footer from "@/components/layout/Footer";
 import Sidebar from "@/components/layout/Sidebar";
+import { useToast } from "@/components/ui/Toast";
 import PageTransition from "@/components/layout/PageTransition";
-import LoadingSkeleton from "@/components/ui/LoadingSkeleton";
+import { useAuthStore } from "@/store/authStore";
+
+interface ServerStats {
+  totalUsers: number;
+  activeUsers: number;
+  pendingUsers: number;
+  totalAssignments: number;
+  evaluatedAssignments: number;
+  totalContent: number;
+  totalSubjects: number;
+}
+
+const LogoutIcon = () => (
+  <svg
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <polyline points="16 17 21 12 16 7" />
+    <line x1="21" y1="12" x2="9" y2="12" />
+  </svg>
+);
 
 export default function ManagementDashboard() {
   const router = useRouter();
-  const [stats, setStats] = useState<any>(null);
+  const user = useAuthStore((s) => s.user);
+  const { showToast } = useToast();
+
+  const userName = user?.name || "";
+  const userLevel = user?.level || "";
+  const userId = user?.id || "";
+  const managementLevel = (user as any)?.managementLevel || "";
+
+  const [stats, setStats] = useState<ServerStats>({
+    totalUsers: 0,
+    activeUsers: 0,
+    pendingUsers: 0,
+    totalAssignments: 0,
+    evaluatedAssignments: 0,
+    totalContent: 0,
+    totalSubjects: 0,
+  });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const role = localStorage.getItem("userRole");
-    if (role !== "MANAGEMENT" && role !== "ADMIN") {
-      router.push("/login");
-      return;
-    }
-    fetchStats();
-  }, []);
-
-  const fetchStats = async () => {
+  const loadStats = useCallback(async () => {
     try {
       const res = await fetch("/api/server/stats");
       const data = await res.json();
       if (data.success) setStats(data.data);
-    } catch (e) {
-      console.error(e);
+    } catch {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
+
+  useEffect(() => {
+    if (!userId) return;
+    let channel: any = null;
+    (async () => {
+      try {
+        const P = (await import("pusher-js")).default;
+        const p = new P(
+          process.env.NEXT_PUBLIC_PUSHER_KEY || "45585387a0d70f319a67",
+          { cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || "eu" },
+        );
+        channel = p.subscribe(`user-${userId}`);
+        channel.bind("notification", () => loadStats());
+      } catch {}
+    })();
+    return () => {
+      if (channel) {
+        channel.unbind_all();
+        channel.unsubscribe();
+      }
+    };
+  }, [userId, loadStats]);
+
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
   };
 
-  const quickLinks = [
-    { label: "إدارة التوليد", path: "/management/generation", icon: "🏗️", color: "#00e5ff" },
-    { label: "ترقية المستخدمين", path: "/management/upgrade", icon: "⬆️", color: "#bf5af2" },
-    { label: "الحسابات المفعلة", path: "/management/activated-accounts", icon: "✅", color: "#2ea043" },
-    { label: "استهلاك السيرفر", path: "/management/server-usage", icon: "📊", color: "#ffca28" },
-    { label: "المكتبة التعليمية", path: "/library", icon: "📚", color: "#00e5ff" },
-    { label: "المحادثة", path: "/chat", icon: "💬", color: "#39ff14" },
+  const getLevelLabel = (l: string) =>
+    ({
+      LEVEL_1: "المستوى الأول",
+      LEVEL_2: "المستوى الثاني",
+      LEVEL_3: "المستوى الثالث",
+      LEVEL_4: "المستوى الرابع",
+    })[l] || l;
+  const getManagementLabel = () =>
+    managementLevel
+      ? `إدارة ${getLevelLabel(managementLevel)}`
+      : getLevelLabel(userLevel);
+
+  const glassStyle: React.CSSProperties = {
+    background: "rgba(10,20,40,0.5)",
+    backdropFilter: "blur(25px)",
+    WebkitBackdropFilter: "blur(25px)",
+    border: "1px solid rgba(0,229,255,0.12)",
+    borderRadius: "18px",
+  };
+
+  const statCards = [
+    {
+      label: "إجمالي المستخدمين",
+      value: stats.totalUsers,
+      icon: "👥",
+      color: "#00e5ff",
+    },
+    {
+      label: "الحسابات المفعلة",
+      value: stats.activeUsers,
+      icon: "✅",
+      color: "#2ea043",
+    },
+    {
+      label: "الحسابات المعلقة",
+      value: stats.pendingUsers,
+      icon: "⏳",
+      color: "#ffca28",
+    },
+    {
+      label: "إجمالي التكاليف",
+      value: stats.totalAssignments,
+      icon: "📤",
+      color: "#bf5af2",
+    },
+    {
+      label: "التكاليف المقيمة",
+      value: stats.evaluatedAssignments,
+      icon: "📝",
+      color: "#39ff14",
+    },
+    {
+      label: "محتوى المكتبة",
+      value: stats.totalContent,
+      icon: "📚",
+      color: "#ff6b6b",
+    },
+  ];
+
+  const shortcuts = [
+    {
+      label: "إدارة التوليد",
+      icon: "🏗️",
+      path: "/management/generation",
+      color: "#00e5ff",
+    },
+    {
+      label: "ترقية المستخدمين",
+      icon: "⬆️",
+      path: "/admin/promotions",
+      color: "#bf5af2",
+    },
+    {
+      label: "الحسابات المفعلة",
+      icon: "✅",
+      path: "/management/activated-accounts",
+      color: "#2ea043",
+    },
+    {
+      label: "استهلاك السيرفر",
+      icon: "💻",
+      path: "/management/server-usage",
+      color: "#39ff14",
+    },
+    {
+      label: "سجل العمليات",
+      icon: "📜",
+      path: "/management/audit-log",
+      color: "#ffca28",
+    },
+    {
+      label: "المكتبة التعليمية",
+      icon: "📚",
+      path: "/library",
+      color: "#00e5ff",
+    },
+    { label: "المحادثة", icon: "💬", path: "/chat", color: "#39ff14" },
+    {
+      label: "نشر تعميم",
+      icon: "📢",
+      path: "/announcements/create",
+      color: "#ff3131",
+    },
+    { label: "الإعدادات", icon: "⚙️", path: "/settings", color: "#8b949e" },
   ];
 
   return (
-    <div className="min-h-screen bg-[#010204]" style={{ fontFamily: "'Cairo', sans-serif" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "transparent",
+        fontFamily: "'Cairo', sans-serif",
+        color: "#fff",
+      }}
+    >
       <Header />
       <Sidebar />
-
       <PageTransition>
-      <div className="relative z-10 pr-0 lg:pr-[20px] p-4 lg:p-8 pt-[100px] max-w-7xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-2xl lg:text-3xl font-bold text-white mb-2 text-center lg:text-right">
-            لوحة تحكم الإدارة
-          </h1>
-          <p className="text-[#8b949e] text-sm mb-8 text-center lg:text-right">
-            إدارة المستوى الدراسي والإشراف على الطلاب والمعلمين
-          </p>
+        <main
+          style={{
+            maxWidth: "1300px",
+            margin: "0 auto",
+            padding: "100px 20px 60px",
+          }}
+        >
+          {/* ========== الهيدر ========== */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              ...glassStyle,
+              padding: "20px 30px",
+              marginBottom: "25px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: "15px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
+              <motion.div
+                animate={{
+                  boxShadow: [
+                    "0 0 15px rgba(255,202,40,0.4)",
+                    "0 0 25px rgba(255,202,40,0.2)",
+                    "0 0 15px rgba(255,202,40,0.4)",
+                  ],
+                }}
+                transition={{ repeat: Infinity, duration: 2 }}
+                style={{
+                  width: "50px",
+                  height: "50px",
+                  borderRadius: "14px",
+                  background: "rgba(255,202,40,0.15)",
+                  border: "2px solid #ffca28",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "1.4rem",
+                  fontWeight: 800,
+                  color: "#ffca28",
+                }}
+              >
+                {userName.charAt(0)}
+              </motion.div>
+              <div>
+                <h2
+                  style={{
+                    color: "#ffca28",
+                    fontSize: "clamp(1.1rem,3vw,1.5rem)",
+                    fontWeight: 800,
+                    margin: 0,
+                  }}
+                >
+                  🏢 مرحباً، {userName}
+                </h2>
+                <p
+                  style={{
+                    color: "#8b949e",
+                    fontSize: "0.85rem",
+                    margin: "4px 0 0",
+                  }}
+                >
+                  {getManagementLabel()}
+                </p>
+              </div>
+            </div>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={handleLogout}
+              style={{
+                padding: "10px 20px",
+                borderRadius: "12px",
+                background: "rgba(248,81,73,0.1)",
+                border: "1px solid rgba(248,81,73,0.25)",
+                color: "#f85149",
+                cursor: "pointer",
+                fontFamily: "'Cairo', sans-serif",
+                fontWeight: 700,
+                fontSize: "0.9rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              <LogoutIcon /> تسجيل الخروج
+            </motion.button>
+          </motion.div>
 
+          {/* ========== بطاقات إحصائية ========== */}
           {loading ? (
-            <LoadingSkeleton variant="card" count={4} />
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "10px",
+                marginBottom: "25px",
+              }}
+            >
+              {Array(6)
+                .fill(0)
+                .map((_, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      ...glassStyle,
+                      padding: "16px 20px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "15px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "48px",
+                        height: "48px",
+                        borderRadius: "14px",
+                        background: "rgba(255,255,255,0.04)",
+                        flexShrink: 0,
+                      }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div
+                        style={{
+                          height: "14px",
+                          width: "40%",
+                          background: "rgba(255,255,255,0.04)",
+                          borderRadius: "6px",
+                          marginBottom: "8px",
+                        }}
+                      />
+                      <div
+                        style={{
+                          height: "20px",
+                          width: "30%",
+                          background: "rgba(255,255,255,0.06)",
+                          borderRadius: "6px",
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+            </div>
           ) : (
-            <>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-                {[
-                  { label: "إجمالي المستخدمين", value: stats?.totalUsers || 0, color: "#00e5ff" },
-                  { label: "الحسابات المفعلة", value: stats?.activeUsers || 0, color: "#2ea043" },
-                  { label: "الطلاب المنتظرين", value: stats?.pendingUsers || 0, color: "#ffca28" },
-                  { label: "التكاليف المرفوعة", value: stats?.totalAssignments || 0, color: "#bf5af2" },
-                ].map((card, i) => (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "10px",
+                marginBottom: "25px",
+              }}
+            >
+              {statCards.map((stat, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  whileHover={{
+                    scale: 1.015,
+                    borderColor: stat.color,
+                    boxShadow: `0 8px 30px ${stat.color}18`,
+                  }}
+                  style={{
+                    ...glassStyle,
+                    padding: "16px 20px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "16px",
+                    cursor: "default",
+                    transition: "all 0.3s",
+                    border: `1px solid rgba(255,255,255,0.06)`,
+                  }}
+                >
                   <motion.div
-                    className="hover-glow"
-                    key={i}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.1 }}
+                    animate={{
+                      boxShadow: [
+                        `0 0 15px ${stat.color}30`,
+                        `0 0 25px ${stat.color}15`,
+                        `0 0 15px ${stat.color}30`,
+                      ],
+                    }}
+                    transition={{
+                      repeat: Infinity,
+                      duration: 2.5,
+                      delay: i * 0.3,
+                    }}
                     style={{
-                      background: "rgba(13, 17, 23, 0.92)",
-                      backdropFilter: "blur(20px)",
-                      border: `1px solid ${card.color}33`,
+                      width: "52px",
+                      height: "52px",
                       borderRadius: "16px",
-                      padding: "20px",
-                      textAlign: "center",
+                      background: `${stat.color}15`,
+                      border: `1.5px solid ${stat.color}40`,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.6rem",
+                      flexShrink: 0,
                     }}
                   >
-                    <p style={{ color: card.color, fontSize: "2rem", fontWeight: 800, fontFamily: "'Orbitron', sans-serif" }}>
-                      {card.value}
-                    </p>
-                    <p style={{ color: "#8b949e", fontSize: "0.85rem", marginTop: 8 }}>{card.label}</p>
+                    {stat.icon}
                   </motion.div>
-                ))}
-              </div>
-
-              <h2 className="text-xl font-bold text-white mb-4">الاختصارات السريعة</h2>
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                {quickLinks.map((link, i) => (
-                  <motion.button
-                    key={i}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.2 + i * 0.05 }}
-                    onClick={() => router.push(link.path)}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        color: "#8b949e",
+                        fontSize: "0.8rem",
+                        marginBottom: "4px",
+                      }}
+                    >
+                      {stat.label}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "1.5rem",
+                        fontWeight: 800,
+                        color: stat.color,
+                        lineHeight: 1,
+                      }}
+                    >
+                      {stat.value.toLocaleString("ar-YE")}
+                    </div>
+                  </div>
+                  <div
                     style={{
-                      background: "rgba(13, 17, 23, 0.92)",
-                      backdropFilter: "blur(20px)",
-                      border: `1px solid ${link.color}22`,
-                      borderRadius: "16px",
-                      padding: "20px",
-                      cursor: "pointer",
-                      textAlign: "center",
-                      transition: "all 0.3s",
+                      width: "3px",
+                      height: "40px",
+                      borderRadius: "2px",
+                      background: `linear-gradient(180deg, ${stat.color}60, ${stat.color}10)`,
+                      flexShrink: 0,
                     }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = link.color;
-                      e.currentTarget.style.boxShadow = `0 0 30px ${link.color}22`;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = `${link.color}22`;
-                      e.currentTarget.style.boxShadow = "none";
-                    }}
-                  >
-                    <div style={{ fontSize: "2rem", marginBottom: 8 }}>{link.icon}</div>
-                    <p className="text-white font-bold text-sm">{link.label}</p>
-                  </motion.button>
-                ))}
-              </div>
-            </>
+                  />
+                </motion.div>
+              ))}
+            </motion.div>
           )}
-        </motion.div>
-      </div>
+
+          {/* ========== اختصارات سريعة ========== */}
+          <motion.h3
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            style={{ color: "#8b949e", fontSize: "1rem", marginBottom: "15px" }}
+          >
+            ⚡ اختصارات سريعة
+          </motion.h3>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+              gap: "10px",
+            }}
+          >
+            {shortcuts.map((s, i) => (
+              <motion.button
+                key={s.path}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 + i * 0.03 }}
+                whileHover={{
+                  scale: 1.05,
+                  y: -4,
+                  boxShadow: `0 12px 30px ${s.color}22`,
+                }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => router.push(s.path)}
+                style={{
+                  ...glassStyle,
+                  padding: "16px 8px",
+                  textAlign: "center",
+                  cursor: "pointer",
+                  border: `1px solid ${s.color}22`,
+                  transition: "all 0.3s",
+                }}
+              >
+                <div style={{ fontSize: "1.6rem", marginBottom: "4px" }}>
+                  {s.icon}
+                </div>
+                <div
+                  style={{
+                    color: "#e6edf3",
+                    fontWeight: 600,
+                    fontSize: "0.8rem",
+                  }}
+                >
+                  {s.label}
+                </div>
+              </motion.button>
+            ))}
+          </motion.div>
+        </main>
       </PageTransition>
+      <Footer />
     </div>
   );
 }
