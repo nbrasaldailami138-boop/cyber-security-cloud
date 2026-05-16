@@ -19,14 +19,17 @@ export async function GET(request: NextRequest) {
     }
 
     const { payload } = await jwtVerify(accessToken, ACCESS_SECRET);
-    if (payload.role !== "ADMIN" && payload.role !== "MANAGEMENT") {
+    const userRole = payload.role as string;
+    const managementLevel = payload.managementLevel as string | undefined;
+
+    // السماح للأدمن والإدارة والمرقّين
+    if (userRole !== "ADMIN" && userRole !== "MANAGEMENT" && !managementLevel) {
       return NextResponse.json(
         { success: false, message: "غير مصرح" },
         { status: 403 },
       );
     }
 
-    const userRole = payload.role as string;
     const userLevel = payload.level as string;
 
     const { searchParams } = new URL(request.url);
@@ -37,14 +40,14 @@ export async function GET(request: NextRequest) {
     const email = searchParams.get("email");
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
     const limit = Math.min(
-      100,
+      1000,
       Math.max(1, parseInt(searchParams.get("limit") || "20")),
     );
 
     const where: any = { deletedAt: null };
 
-    // عزل أكاديمي للإدارة
-    if (userRole === "MANAGEMENT" && userLevel) {
+    // عزل أكاديمي للإدارة والمرقّين
+    if ((userRole === "MANAGEMENT" || managementLevel) && userLevel) {
       where.level = userLevel;
     } else if (level) {
       where.level = level;

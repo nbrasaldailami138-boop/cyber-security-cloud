@@ -8,6 +8,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const level = searchParams.get("level");
     const semester = searchParams.get("semester") || "TERM_1";
+    const teacherId = searchParams.get("teacherId");
 
     if (!level) {
       return NextResponse.json(
@@ -16,13 +17,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const where: any = {
+      level: level as any,
+      semester: semester as any,
+      isActive: true,
+      deletedAt: null,
+    };
+
+    if (teacherId) {
+      where.teacherId = teacherId;
+    }
+
     const subjects = await prisma.subject.findMany({
-      where: {
-        level: level as any,
-        semester: semester as any,
-        isActive: true,
-        deletedAt: null,
-      },
+      where,
       include: {
         teacher: { select: { name: true } },
       },

@@ -53,8 +53,22 @@ const allMenuItems: MenuItem[] = [
     label: "سجل العمليات",
     icon: "📜",
     path: "/admin/audit-log",
-    roles: ["ADMIN", "TEACHER"],
+    roles: ["ADMIN"],
     color: "#ffca28",
+  },
+  {
+    label: "سجل العمليات",
+    icon: "📜",
+    path: "/management/audit-log",
+    roles: ["MANAGEMENT"],
+    color: "#ffca28",
+  },
+  {
+    label: "المهام المنجزة",
+    icon: "📋",
+    path: "/teacher/audit-log",
+    roles: ["TEACHER"],
+    color: "#bf5af2",
   },
   {
     label: "ترقية المستخدمين",

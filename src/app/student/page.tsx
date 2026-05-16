@@ -197,6 +197,7 @@ export default function StudentDashboard() {
     try {
       const res = await fetch(
         `/api/grades/list?page=${gradesPag.page}&limit=${gradesPag.limit}`,
+        { credentials: "include" },
       );
       const data = await res.json();
       if (data.success) setGrades(data.data);
@@ -1163,7 +1164,7 @@ export default function StudentDashboard() {
                                 fontSize: "1rem",
                               }}
                             >
-                              {item.subject.name}
+                              {item.subjectName}
                             </div>
                             <div
                               style={{

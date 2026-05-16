@@ -5,6 +5,7 @@ export interface JWTPayload {
   email: string;
   role: UserRole;
   level?: AcademicLevel;
+  managementLevel?: AcademicLevel | null;
   type: "access" | "refresh";
   iat?: number;
   exp?: number;

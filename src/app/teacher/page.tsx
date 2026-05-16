@@ -1305,6 +1305,7 @@ export default function TeacherDashboard() {
             )}
 
             {/* ===== توزيع الدرجات ===== */}
+            {/* ===== توزيع الدرجات ===== */}
             {activeTab === "grades" && (
               <motion.div
                 key="grades"
@@ -1315,135 +1316,52 @@ export default function TeacherDashboard() {
                 <div
                   style={{
                     ...glassStyle,
-                    padding: "30px",
+                    padding: "50px 20px",
+                    textAlign: "center",
                     maxWidth: "600px",
                     margin: "0 auto",
                   }}
                 >
+                  <div style={{ fontSize: "3rem", marginBottom: "15px" }}>
+                    📊
+                  </div>
                   <h3
                     style={{
                       color: "#00e5ff",
-                      fontSize: "1.2rem",
+                      fontSize: "1.3rem",
                       fontWeight: 700,
-                      marginBottom: "20px",
-                      textAlign: "center",
+                      marginBottom: "10px",
                     }}
                   >
-                    📤 رفع ملف توزيع الدرجات
+                    تصدير وتوزيع الدرجات
                   </h3>
-
-                  <div style={{ marginBottom: "16px" }}>
-                    <label
-                      style={{
-                        display: "block",
-                        color: "#8b949e",
-                        marginBottom: "6px",
-                        textAlign: "center",
-                      }}
-                    >
-                      اختر المادة
-                    </label>
-                    <select
-                      value={gradeSubject}
-                      onChange={(e) => setGradeSubject(e.target.value)}
-                      style={{
-                        ...inputStyle,
-                        cursor: "pointer",
-                        appearance: "none",
-                      }}
-                    >
-                      <option value="">-- اختر المادة --</option>
-                      {subjects.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} ({s.code})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div style={{ marginBottom: "16px" }}>
-                    <label
-                      style={{
-                        display: "block",
-                        color: "#8b949e",
-                        marginBottom: "6px",
-                        textAlign: "center",
-                      }}
-                    >
-                      اختر ملف (Excel / PDF / Word / صورة)
-                    </label>
-                    <motion.div
-                      whileHover={{ borderColor: "rgba(0,229,255,0.4)" }}
-                      onClick={() => gradeFileRef.current?.click()}
-                      style={{
-                        ...inputStyle,
-                        border: "2px dashed rgba(255,255,255,0.15)",
-                        padding: "20px",
-                        textAlign: "center",
-                        cursor: "pointer",
-                        color: "#8b949e",
-                      }}
-                    >
-                      {gradeFile ? (
-                        <span style={{ color: "#00e5ff" }}>
-                          📎 {gradeFile.name}
-                        </span>
-                      ) : (
-                        "اسحب وأفلت الملف هنا أو انقر للاختيار"
-                      )}
-                    </motion.div>
-                    <input
-                      ref={gradeFileRef}
-                      type="file"
-                      accept=".xlsx,.xls,.pdf,.csv,.docx,.png,.jpg,.jpeg"
-                      style={{ display: "none" }}
-                      onChange={(e) =>
-                        setGradeFile(e.target.files?.[0] || null)
-                      }
-                    />
-                    {gradeFile && (
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => setGradeFile(null)}
-                        style={{
-                          marginTop: "8px",
-                          padding: "6px 14px",
-                          borderRadius: "8px",
-                          background: "rgba(248,81,73,0.1)",
-                          border: "1px solid rgba(248,81,73,0.2)",
-                          color: "#f85149",
-                          cursor: "pointer",
-                          fontSize: "0.8rem",
-                          fontWeight: 600,
-                        }}
-                      >
-                        إزالة الملف
-                      </motion.button>
-                    )}
-                  </div>
-
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={handleGradeUpload}
-                    disabled={gradeUploading}
+                  <p
                     style={{
-                      width: "100%",
-                      padding: "14px",
-                      borderRadius: "12px",
+                      color: "#8b949e",
+                      fontSize: "0.9rem",
+                      marginBottom: "25px",
+                    }}
+                  >
+                    رفع ملفات الدرجات وتحليلها وتوزيعها على الطلاب
+                  </p>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => router.push("/teacher/grades")}
+                    style={{
+                      padding: "14px 30px",
+                      borderRadius: "14px",
+                      background: "linear-gradient(135deg,#00e5ff,#0077b6)",
                       border: "none",
-                      background: "linear-gradient(135deg, #238636, #2ea043)",
-                      color: "#fff",
+                      color: "#010204",
                       fontWeight: 800,
                       fontSize: "1rem",
                       cursor: "pointer",
                       fontFamily: "'Cairo', sans-serif",
-                      opacity: gradeUploading ? 0.6 : 1,
-                      boxShadow: "0 8px 25px rgba(35,134,54,0.3)",
+                      boxShadow: "0 8px 25px rgba(0,229,255,0.25)",
                     }}
                   >
-                    {gradeUploading ? "⏳ جاري الرفع..." : "🚀 رفع ملف الدرجات"}
+                    📊 الذهاب إلى صفحة تصدير الدرجات
                   </motion.button>
                 </div>
               </motion.div>

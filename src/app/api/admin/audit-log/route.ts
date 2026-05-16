@@ -14,17 +14,33 @@ export async function GET(request: NextRequest) {
     }
 
     const { payload } = await jwtVerify(accessToken, ACCESS_SECRET);
-    if (payload.role !== "ADMIN" && payload.role !== "MANAGEMENT") {
+    const userId = payload.sub as string;
+
+    // جلب المستخدم للتحقق من managementLevel
+    const user = await prisma.user.findUnique({
+      where: { id: userId, deletedAt: null },
+      select: { role: true, level: true, managementLevel: true },
+    });
+
+    if (!user) return NextResponse.json({ success: false }, { status: 403 });
+
+    const effectiveRole = user.managementLevel ? "MANAGEMENT" : user.role;
+    if (effectiveRole !== "ADMIN" && effectiveRole !== "MANAGEMENT") {
       return NextResponse.json({ success: false }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
-    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20")));
+    const limit = Math.min(
+      100,
+      Math.max(1, parseInt(searchParams.get("limit") || "20")),
+    );
 
     const where: any = {};
-    if (payload.role === "MANAGEMENT" && payload.level) {
-      where.level = payload.level as string;
+    if (effectiveRole === "MANAGEMENT" && user.managementLevel) {
+      where.level = user.managementLevel;
+    } else if (effectiveRole === "MANAGEMENT" && user.level) {
+      where.level = user.level;
     }
 
     const [logs, total] = await Promise.all([

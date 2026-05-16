@@ -12,20 +12,17 @@ import Pagination from "@/components/ui/Pagination";
 import { usePagination } from "@/hooks/usePagination";
 import { useAuthStore } from "@/store/authStore";
 
-// ==================== الأنواع ====================
 interface LogItem {
   id: string;
   action: string;
   severity: string;
   description: string;
   ipAddress: string;
-  deviceInfo?: string;
   createdAt: string;
   user?: { name: string; role: string };
   level?: string;
 }
 
-// ==================== الأيقونات ====================
 const BackIcon = () => (
   <svg
     width="20"
@@ -41,7 +38,6 @@ const BackIcon = () => (
     <polyline points="12 19 5 12 12 5" />
   </svg>
 );
-
 const RefreshIcon = () => (
   <svg
     width="18"
@@ -58,22 +54,17 @@ const RefreshIcon = () => (
   </svg>
 );
 
-// ==================== المكوّن الرئيسي ====================
-export default function AuditLogPage() {
+export default function ManagementAuditLogPage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const { showToast } = useToast();
-
-  const userRole = user?.role || "";
   const userId = user?.id || "";
 
   const [logs, setLogs] = useState<LogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
   const pag = usePagination(1, 20);
 
-  // ==================== تحميل السجل ====================
   const loadLogs = useCallback(async () => {
     setLoading(true);
     try {
@@ -84,11 +75,8 @@ export default function AuditLogPage() {
       if (data.success) {
         setLogs(data.data || []);
         pag.setTotal(data.total || 0);
-      } else {
-        showToast("فشل تحميل السجل", "error");
-      }
+      } else showToast("فشل تحميل السجل", "error");
     } catch {
-      /* صامت */
     } finally {
       setLoading(false);
     }
@@ -98,35 +86,26 @@ export default function AuditLogPage() {
     loadLogs();
   }, [loadLogs]);
 
-  // ==================== تحديث يدوي ====================
   const handleRefresh = async () => {
     setRefreshing(true);
     await loadLogs();
     setRefreshing(false);
   };
 
-  // ==================== Pusher ====================
   useEffect(() => {
     if (!userId) return;
     let channel: any = null;
-    const setup = async () => {
+    (async () => {
       try {
-        const PusherClient = (await import("pusher-js")).default;
-        const pusher = new PusherClient(
+        const P = (await import("pusher-js")).default;
+        const p = new P(
           process.env.NEXT_PUBLIC_PUSHER_KEY || "45585387a0d70f319a67",
-          {
-            cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || "eu",
-          },
+          { cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || "eu" },
         );
-        channel = pusher.subscribe(`user-${userId}`);
-        channel.bind("notification", () => {
-          loadLogs();
-        });
-      } catch {
-        /* صامت */
-      }
-    };
-    setup();
+        channel = p.subscribe(`user-${userId}`);
+        channel.bind("notification", () => loadLogs());
+      } catch {}
+    })();
     return () => {
       if (channel) {
         channel.unbind_all();
@@ -135,7 +114,6 @@ export default function AuditLogPage() {
     };
   }, [userId, loadLogs]);
 
-  // ==================== أدوات مساعدة ====================
   const getSeverityColor = (s: string) =>
     ({
       CRITICAL: "#ff3131",
@@ -152,9 +130,8 @@ export default function AuditLogPage() {
     })[s] || "rgba(255,255,255,0.03)";
   const getSeverityIcon = (s: string) =>
     ({ CRITICAL: "🔴", ERROR: "🟠", WARNING: "🟡", INFO: "🔵" })[s] || "⚪";
-
   const getActionLabel = (a: string) => {
-    const labels: Record<string, string> = {
+    const l: Record<string, string> = {
       LOGIN: "تسجيل دخول",
       LOGOUT: "تسجيل خروج",
       CREATE: "إنشاء",
@@ -169,11 +146,10 @@ export default function AuditLogPage() {
       LEVEL_PROMOTION: "ترقية مستوى",
       SEMESTER_SWITCH: "تبديل ترم",
     };
-    return labels[a] || a;
+    return l[a] || a;
   };
-
-  const getActionIcon = (a: string) => {
-    const icons: Record<string, string> = {
+  const getActionIcon = (a: string) =>
+    ({
       LOGIN: "🔑",
       LOGOUT: "🚪",
       CREATE: "➕",
@@ -186,24 +162,20 @@ export default function AuditLogPage() {
       FAILED_LOGIN: "❌",
       SUSPICIOUS_ACTIVITY: "⚠️",
       LEVEL_PROMOTION: "🎓",
-    };
-    return icons[a] || "📌";
-  };
-
+    })[a] || "📌";
   const getLevelLabel = (l?: string) =>
     l
       ? { LEVEL_1: "م1", LEVEL_2: "م2", LEVEL_3: "م3", LEVEL_4: "م4" }[l] || l
       : "";
 
   const glassStyle: React.CSSProperties = {
-    background: "rgba(10, 20, 40, 0.5)",
+    background: "rgba(10,20,40,0.5)",
     backdropFilter: "blur(25px)",
     WebkitBackdropFilter: "blur(25px)",
-    border: "1px solid rgba(0, 229, 255, 0.12)",
+    border: "1px solid rgba(0,229,255,0.12)",
     borderRadius: "18px",
   };
 
-  // ==================== إحصائيات ====================
   const stats = {
     total: logs.length,
     critical: logs.filter(
@@ -232,7 +204,6 @@ export default function AuditLogPage() {
             padding: "100px 20px 60px",
           }}
         >
-          {/* ========== الهيدر ========== */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -251,9 +222,7 @@ export default function AuditLogPage() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() =>
-                  router.push(userRole === "ADMIN" ? "/admin" : "/management")
-                }
+                onClick={() => router.push("/management")}
                 style={{
                   width: "42px",
                   height: "42px",
@@ -273,7 +242,7 @@ export default function AuditLogPage() {
                 <h2
                   style={{
                     color: "#ffca28",
-                    fontSize: "clamp(1.2rem, 3vw, 1.5rem)",
+                    fontSize: "clamp(1.2rem,3vw,1.5rem)",
                     fontWeight: 800,
                     margin: 0,
                   }}
@@ -287,7 +256,7 @@ export default function AuditLogPage() {
                     margin: "4px 0 0",
                   }}
                 >
-                  جميع الأنشطة والأحداث في النظام
+                  جميع الأنشطة في مستواك
                 </p>
               </div>
             </div>
@@ -321,7 +290,6 @@ export default function AuditLogPage() {
             </motion.button>
           </motion.div>
 
-          {/* ========== بطاقات إحصائية ========== */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -357,7 +325,7 @@ export default function AuditLogPage() {
                 icon: "❌",
                 color: "#ff3131",
               },
-            ].map((stat, i) => (
+            ].map((s, i) => (
               <motion.div
                 key={i}
                 initial={{ opacity: 0, x: -20 }}
@@ -367,25 +335,24 @@ export default function AuditLogPage() {
                 style={{ ...glassStyle, padding: "16px", textAlign: "center" }}
               >
                 <div style={{ fontSize: "1.8rem", marginBottom: "4px" }}>
-                  {stat.icon}
+                  {s.icon}
                 </div>
                 <div
                   style={{
                     fontSize: "1.4rem",
                     fontWeight: 800,
-                    color: stat.color,
+                    color: s.color,
                   }}
                 >
-                  {stat.value}
+                  {s.value}
                 </div>
                 <div style={{ fontSize: "0.75rem", color: "#8b949e" }}>
-                  {stat.label}
+                  {s.label}
                 </div>
               </motion.div>
             ))}
           </motion.div>
 
-          {/* ========== السجل ========== */}
           {loading ? (
             <div style={{ textAlign: "center", padding: "60px" }}>
               <motion.div
@@ -400,28 +367,18 @@ export default function AuditLogPage() {
                   margin: "0 auto 20px",
                 }}
               />
-              <p style={{ color: "#8b949e" }}>جاري تحميل السجل...</p>
             </div>
           ) : logs.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
+            <div
               style={{ ...glassStyle, padding: "60px", textAlign: "center" }}
             >
               <div style={{ fontSize: "4rem", marginBottom: "15px" }}>📭</div>
-              <h3
-                style={{
-                  color: "#8b949e",
-                  fontSize: "1.3rem",
-                  marginBottom: "8px",
-                }}
-              >
+              <h3 style={{ color: "#8b949e", fontSize: "1.3rem" }}>
                 لا توجد عمليات مسجلة
               </h3>
-            </motion.div>
+            </div>
           ) : (
             <>
-              {/* جدول للكمبيوتر */}
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -492,10 +449,7 @@ export default function AuditLogPage() {
                             <td
                               style={{ padding: "10px", textAlign: "center" }}
                             >
-                              <span
-                                style={{ fontSize: "1.1rem" }}
-                                title={log.severity}
-                              >
+                              <span style={{ fontSize: "1.1rem" }}>
                                 {getSeverityIcon(log.severity)}
                               </span>
                             </td>
@@ -584,8 +538,6 @@ export default function AuditLogPage() {
                   </table>
                 </div>
               </motion.div>
-
-              {/* بطاقات للجوال */}
               <div
                 className="lg:hidden"
                 style={{ display: "flex", flexDirection: "column", gap: "8px" }}
@@ -685,7 +637,6 @@ export default function AuditLogPage() {
                   ))}
                 </AnimatePresence>
               </div>
-
               <div style={{ marginTop: "20px" }}>
                 <Pagination
                   page={pag.page}

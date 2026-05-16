@@ -198,6 +198,7 @@ export async function POST(request: NextRequest) {
       email: user.email,
       role: user.role,
       level: user.level || undefined,
+      managementLevel: user.managementLevel || undefined,
     };
 
     const accessToken = await generateAccessToken(payload);

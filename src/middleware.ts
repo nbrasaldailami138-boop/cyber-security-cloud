@@ -143,41 +143,45 @@ export async function middleware(request: NextRequest) {
   try {
     const { payload } = await jwtVerify(accessToken, ACCESS_SECRET);
     const userRole = payload.role as string;
+    const managementLevel = payload.managementLevel as string | undefined;
+
+    // المستخدم مرقّى لإدارة - يعتبر إدارة أيضاً
+    const effectiveRole = managementLevel ? "MANAGEMENT" : userRole;
 
     const isAdminPath = adminPaths.some((p) => pathname.startsWith(p));
     const isAllowedManagementPath =
-      userRole === "MANAGEMENT" &&
+      effectiveRole === "MANAGEMENT" &&
       (pathname.startsWith("/admin/generation/students") ||
         pathname.startsWith("/admin/generation/subjects") ||
         pathname === "/admin/generation");
 
-    if (isAdminPath && userRole !== "ADMIN" && !isAllowedManagementPath) {
+    if (isAdminPath && effectiveRole !== "ADMIN" && !isAllowedManagementPath) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
 
     if (
       managementPaths.some((p) => pathname.startsWith(p)) &&
-      userRole !== "MANAGEMENT" &&
-      userRole !== "ADMIN"
+      effectiveRole !== "MANAGEMENT" &&
+      effectiveRole !== "ADMIN"
     ) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
 
     if (
       teacherPaths.some((p) => pathname.startsWith(p)) &&
-      userRole !== "TEACHER" &&
-      userRole !== "ADMIN" &&
-      userRole !== "MANAGEMENT"
+      effectiveRole !== "TEACHER" &&
+      effectiveRole !== "ADMIN" &&
+      effectiveRole !== "MANAGEMENT"
     ) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
 
     if (
       studentPaths.some((p) => pathname.startsWith(p)) &&
-      userRole !== "STUDENT" &&
-      userRole !== "ADMIN" &&
-      userRole !== "MANAGEMENT" &&
-      userRole !== "TEACHER"
+      effectiveRole !== "STUDENT" &&
+      effectiveRole !== "ADMIN" &&
+      effectiveRole !== "MANAGEMENT" &&
+      effectiveRole !== "TEACHER"
     ) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
