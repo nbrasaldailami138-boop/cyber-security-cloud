@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashToken } from "@/lib/security";
 import { verifyCaptcha } from "@/lib/captcha";
-import argon2 from "argon2";
+import bcrypt from "bcryptjs";
 import { z } from "zod";
 
 const activateSchema = z
@@ -80,7 +80,10 @@ export async function POST(request: NextRequest) {
     const existingEmail = await prisma.user.findUnique({ where: { email } });
     if (existingEmail && existingEmail.id !== user.id) {
       return NextResponse.json(
-        { success: false, message: "البريد الإلكتروني مستخدم بالفعل في حساب آخر" },
+        {
+          success: false,
+          message: "البريد الإلكتروني مستخدم بالفعل في حساب آخر",
+        },
         { status: 400 },
       );
     }

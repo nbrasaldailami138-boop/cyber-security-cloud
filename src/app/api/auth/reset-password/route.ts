@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashToken } from "@/lib/security";
-import argon2 from "argon2";
+import bcrypt from "bcryptjs";
 import { revokeAllSessions } from "@/lib/auth";
 import { z } from "zod";
 

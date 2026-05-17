@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { prisma } from "@/lib/prisma";
-import argon2 from "argon2";
+import bcrypt from "bcryptjs";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
 
@@ -43,7 +43,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const isCurrentValid = await argon2.verify(user.passwordHash, currentPassword);
+    const isCurrentValid = await argon2.verify(
+      user.passwordHash,
+      currentPassword,
+    );
     if (!isCurrentValid) {
       return NextResponse.json(
         { success: false, message: "كلمة المرور الحالية غير صحيحة" },

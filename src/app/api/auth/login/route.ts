@@ -7,7 +7,7 @@ import {
 } from "@/lib/auth";
 import { loginRateLimiter } from "@/lib/ratelimit";
 import { verifyCaptcha } from "@/lib/captcha";
-import argon2 from "argon2";
+import bcrypt from "bcryptjs";
 import { z } from "zod";
 
 const loginSchema = z.object({
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
     }
 
     // التحقق من كلمة المرور
-    const isPasswordValid = await argon2.verify(user.passwordHash, password);
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
       // زيادة عداد المحاولات الفاشلة
       const failedAttempts = user.failedLoginAttempts + 1;
