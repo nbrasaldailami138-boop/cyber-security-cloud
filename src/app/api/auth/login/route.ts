@@ -41,13 +41,15 @@ export async function POST(request: NextRequest) {
 
     const { username, password, captchaToken } = validation.data;
 
-    // التحقق من CAPTCHA
-    const captchaOk = await verifyCaptcha(captchaToken || null);
-    if (!captchaOk) {
-      return NextResponse.json(
-        { success: false, message: "التحقق البشري فشل. حاول مرة أخرى." },
-        { status: 400 },
-      );
+    // التحقق من CAPTCHA (فقط إذا تم إرسال التوكن)
+    if (captchaToken) {
+      const captchaOk = await verifyCaptcha(captchaToken);
+      if (!captchaOk) {
+        return NextResponse.json(
+          { success: false, message: "التحقق البشري فشل. حاول مرة أخرى." },
+          { status: 400 },
+        );
+      }
     }
 
     // البحث عن المستخدم (بالبريد الإلكتروني أو الاسم)
