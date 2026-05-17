@@ -64,7 +64,7 @@ export async function middleware(request: NextRequest) {
   );
   response.headers.set(
     "Content-Security-Policy",
-    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://ik.imagekit.io; font-src 'self'; connect-src 'self' https://*.pusher.com wss://*.pusher.com https://*.upstash.io; frame-src 'self' https://www.youtube.com;",
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.hcaptcha.com https://newassets.hcaptcha.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https://ik.imagekit.io; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.pusher.com wss://*.pusher.com https://*.upstash.io https://sentry.hcaptcha.com; frame-src 'self' https://www.youtube.com https://newassets.hcaptcha.com;",
   );
 
   const method = request.method;
@@ -155,8 +155,8 @@ export async function middleware(request: NextRequest) {
         pathname.startsWith("/admin/promotions") ||
         pathname.startsWith("/admin/server-usage") ||
         pathname.startsWith("/admin/activated-accounts") ||
-        pathname.startsWith("/admin/audit-log"));
-
+        pathname.startsWith("/admin/audit-log") ||
+        pathname.startsWith("/admin/semester"));
     if (isAdminPath && effectiveRole !== "ADMIN" && !isAllowedManagementPath) {
       return NextResponse.redirect(new URL("/login", request.url));
     }

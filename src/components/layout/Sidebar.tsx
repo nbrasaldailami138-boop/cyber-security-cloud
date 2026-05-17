@@ -36,6 +36,13 @@ const allMenuItems: MenuItem[] = [
     color: "#00e5ff",
   },
   {
+    label: "محرر الأكواد",
+    icon: "💻",
+    path: "/code-editor",
+    roles: ["ADMIN", "MANAGEMENT", "TEACHER", "STUDENT"],
+    color: "#00e5ff",
+  },
+  {
     label: "المحادثة",
     icon: "💬",
     path: "/chat",
@@ -109,16 +116,10 @@ const allMenuItems: MenuItem[] = [
     label: "إدارة الترم",
     icon: "📅",
     path: "/admin/semester",
-    roles: ["ADMIN"],
+    roles: ["ADMIN", "MANAGEMENT"],
     color: "#bf5af2",
   },
-  {
-    label: "ترقية المستويات",
-    icon: "🎓",
-    path: "/admin/upgrade",
-    roles: ["ADMIN"],
-    color: "#ffca28",
-  },
+
   {
     label: "نشر تعميم",
     icon: "📢",
@@ -164,8 +165,15 @@ export default function Sidebar() {
   const userLevel = level || "";
 
   // ==================== الأدوار الفعالة ====================
+  const validManagementLevels = ["LEVEL_1", "LEVEL_2", "LEVEL_3", "LEVEL_4"];
+  const hasValidManagement =
+    managementLevel &&
+    managementLevel !== "null" &&
+    managementLevel !== "undefined" &&
+    validManagementLevels.includes(managementLevel);
+
   const effectiveRoles = [userRole];
-  if (managementLevel) effectiveRoles.push("MANAGEMENT");
+  if (hasValidManagement) effectiveRoles.push("MANAGEMENT");
 
   // ==================== فلترة القائمة مع منع التكرار ====================
   const seenLabels = new Set<string>();
@@ -368,7 +376,7 @@ export default function Sidebar() {
                 {getLevelLabel(userLevel)}
               </span>
             )}
-            {managementLevel && userRole !== "ADMIN" && (
+            {hasValidManagement && userRole !== "ADMIN" && (
               <motion.span
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}

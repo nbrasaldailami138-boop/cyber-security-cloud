@@ -18,6 +18,8 @@ enum UserRole {
 enum AcademicLevel {
   LEVEL_1
   LEVEL_2
+  LEVEL_3
+  LEVEL_4
 }
 
 enum Semester {
@@ -52,6 +54,7 @@ model User {
   lastLoginAt        DateTime?
   lastSeenAt         DateTime?
   managementLevel    AcademicLevel?
+  previousLevel      AcademicLevel?
   lastLoginIp        String?
   failedLoginAttempts Int          @default(0)
   lockedUntil        DateTime?
@@ -100,6 +103,7 @@ model Subject {
   level     AcademicLevel
   semester  Semester      @default(TERM_1)
   isActive  Boolean       @default(true)
+  isVisible Boolean       @default(true)
   teacherId String?
   teacher   User?         @relation("TeacherSubjects", fields: [teacherId], references: [id])
   createdAt DateTime      @default(now())
@@ -278,6 +282,7 @@ enum AuditAction {
   FAILED_LOGIN
   SUSPICIOUS_ACTIVITY
   LEVEL_PROMOTION
+  PROMOTED
   SEMESTER_SWITCH
 }
 

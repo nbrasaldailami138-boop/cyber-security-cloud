@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const level = searchParams.get("level");
-    const semester = searchParams.get("semester") || "TERM_1";
+    const semester = searchParams.get("semester") || null;
     const teacherId = searchParams.get("teacherId");
 
     if (!level) {
@@ -19,10 +19,14 @@ export async function GET(request: NextRequest) {
 
     const where: any = {
       level: level as any,
-      semester: semester as any,
       isActive: true,
+      isVisible: true,
       deletedAt: null,
     };
+
+    if (semester) {
+      where.semester = semester as any;
+    }
 
     if (teacherId) {
       where.teacherId = teacherId;

@@ -39,14 +39,20 @@ export async function GET(request: NextRequest) {
       const pathParts = filePath.split("/").filter((p) => p);
 
       let level = "غير مصنف";
-      for (const part of pathParts) {
-        if (part.match(/level-\d/i)) {
-          level = part.toUpperCase().replace("-", "_");
-          break;
-        }
-        if (part.match(/level-LEVEL_\d/i)) {
-          level = part.replace("level-", "").toUpperCase();
-          break;
+      // استخراج المستوى من مسار code-editor (مثل /code-editor/LEVEL_1/...)
+      const codeEditorMatch = filePath.match(/\/code-editor\/(LEVEL_\d)\//);
+      if (codeEditorMatch) {
+        level = codeEditorMatch[1];
+      } else {
+        for (const part of pathParts) {
+          if (part.match(/level-\d/i)) {
+            level = part.toUpperCase().replace("-", "_");
+            break;
+          }
+          if (part.match(/level-LEVEL_\d/i)) {
+            level = part.replace("level-", "").toUpperCase();
+            break;
+          }
         }
       }
 
@@ -75,9 +81,23 @@ export async function GET(request: NextRequest) {
         } else {
           subFolder = "📊 توزيع الدرجات";
         }
+      } else if (filePath.includes("/code-editor/")) {
+        const parts = filePath.split("/code-editor/");
+        if (parts.length > 1) {
+          const subParts = parts[1].split("/");
+          subFolder = "💻 " + (subParts[0] || "محرر أكواد");
+        } else {
+          subFolder = "💻 محرر الأكواد";
+        }
       }
-
-      if (effectiveLevel && level !== effectiveLevel && level !== "غير مصنف")
+      // مجلد code-editor لا يخضع للفلترة حسب المستوى لأنه جديد
+      const isCodeEditor = filePath.includes("/code-editor/");
+      if (
+        !isCodeEditor &&
+        effectiveLevel &&
+        level !== effectiveLevel &&
+        level !== "غير مصنف"
+      )
         continue;
 
       if (!result[level]) result[level] = {};

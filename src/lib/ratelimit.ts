@@ -7,13 +7,13 @@ const redis = new Redis({
 });
 
 // محدد المعدل: 5 محاولات في الدقيقة
+// مسموح 8 محاولات في الدقيقة (لتغطية المراحل الثلاث: 5 + 3 + 1)
 export const loginRateLimiter = new Ratelimit({
   redis,
-  limiter: Ratelimit.slidingWindow(5, "1 m"),
+  limiter: Ratelimit.slidingWindow(8, "1 m"),
   analytics: true,
   prefix: "ratelimit:login",
 });
-
 // 3 طلبات إعادة تعيين كلمة مرور في الساعة
 export const passwordResetRateLimiter = new Ratelimit({
   redis,

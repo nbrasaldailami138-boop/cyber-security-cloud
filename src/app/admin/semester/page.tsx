@@ -1,157 +1,418 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { csrfFetch } from "@/lib/csrfClient";
-import { motion } from "framer-motion";
-import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import PageTransition from "@/components/layout/PageTransition";
+import { useAuth } from "@/hooks/useAuth";
+import { usePusher } from "@/hooks/usePusher";
 
-type Semester = "TERM_1" | "TERM_2";
+interface SemesterStats {
+  totalLevels: number;
+  totalSubjects: number;
+  levelBreakdown: {
+    level: string;
+    label: string;
+    term1Subjects: number;
+    term2Subjects: number;
+    totalStudents: number;
+    lastPromotion: string | null;
+  }[];
+}
 
-export default function SemesterManagementPage() {
+export default function SemesterPage() {
   const router = useRouter();
-  const [currentSemesters, setCurrentSemesters] = useState<Record<string, Semester>>({});
+  const { user } = useAuth();
+  const [stats, setStats] = useState<SemesterStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [switching, setSwitching] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
 
-  useEffect(() => {
-    const role = localStorage.getItem("userRole");
-    if (role !== "ADMIN") {
-      router.push("/login");
-      return;
-    }
-    fetchSemesters();
-  }, []);
+  const effectiveRole =
+    user?.role === "ADMIN"
+      ? "ADMIN"
+      : user?.managementLevel
+        ? "MANAGEMENT"
+        : user?.role;
+  const userLevel = user?.level || "LEVEL_1";
 
-  const fetchSemesters = async () => {
+  const loadStats = useCallback(async () => {
     try {
-      const [l1, l2] = await Promise.all([
-        fetch("/api/semester/switch?level=LEVEL_1"),
-        fetch("/api/semester/switch?level=LEVEL_2"),
-      ]);
-      const d1 = await l1.json();
-      const d2 = await l2.json();
-      setCurrentSemesters({
-        LEVEL_1: d1.data?.semester || "TERM_1",
-        LEVEL_2: d2.data?.semester || "TERM_1",
-      });
-    } catch (e) {
-      console.error(e);
+      const res = await fetch("/api/semester/stats");
+      const data = await res.json();
+      if (data.success) {
+        setStats(data.data);
+      }
+    } catch (err) {
+      console.error("Semester stats error:", err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const switchSemester = async (level: string, newSemester: Semester) => {
-    setSwitching(level);
-    setMessage("");
-    try {
-      const res = await csrfFetch("/api/semester/switch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ level, semester: newSemester }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setCurrentSemesters((prev) => ({ ...prev, [level]: newSemester }));
-        setMessage(`✅ ${level === "LEVEL_1" ? "المستوى الأول" : "المستوى الثاني"}: تم التبديل إلى ${newSemester === "TERM_1" ? "الترم الأول" : "الترم الثاني"}`);
-      } else {
-        setMessage(`❌ ${data.message}`);
-      }
-    } catch {
-      setMessage("❌ حدث خطأ في الاتصال");
-    } finally {
-      setSwitching(null);
-    }
-  };
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
 
-  const glassCard: React.CSSProperties = {
-    background: "rgba(13, 17, 23, 0.92)",
-    backdropFilter: "blur(20px)",
-    border: "1px solid rgba(0, 229, 255, 0.2)",
-    borderRadius: "16px",
-    padding: "24px",
+  usePusher("semester", "stats-update", () => {
+    loadStats();
+  });
+
+  const getHomePath = () => {
+    if (effectiveRole === "ADMIN") return "/admin";
+    if (effectiveRole === "MANAGEMENT") return "/management";
+    if (effectiveRole === "TEACHER") return "/teacher";
+    return "/student";
   };
 
   return (
-    <div className="min-h-screen bg-[#010204]" style={{ fontFamily: "'Cairo', sans-serif" }}>
-      <Header />
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "transparent",
+        fontFamily: "'Cairo', sans-serif",
+        color: "#fff",
+      }}
+    >
       <Sidebar />
       <PageTransition>
-      <div className="relative z-10 pr-0 lg:pr-[20px] p-4 lg:p-8 pt-[100px] max-w-4xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-2xl lg:text-3xl font-bold text-white mb-2 text-center">إدارة الترم الدراسي</h1>
-          <p className="text-[#8b949e] text-sm mb-8 text-center">التحكم بالترم الحالي لكل مستوى دراسي</p>
-
-          {message && (
-            <div style={{ ...glassCard, borderColor: "#2ea04344", marginBottom: 20, textAlign: "center" }}>
-              <p className="text-white">{message}</p>
+        <main
+          style={{
+            padding: "90px 12px 50px",
+            maxWidth: "900px",
+            margin: "0 auto",
+            width: "100%",
+            boxSizing: "border-box",
+          }}
+        >
+          {/* الهيدر */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "10px",
+              marginBottom: "24px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                flexWrap: "wrap",
+              }}
+            >
+              <button
+                onClick={() => router.push(getHomePath())}
+                style={{
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: "10px",
+                  padding: "8px 14px",
+                  color: "#8b949e",
+                  cursor: "pointer",
+                  fontSize: "0.85rem",
+                  fontFamily: "'Cairo', sans-serif",
+                }}
+              >
+                ⬅ رجوع
+              </button>
+              <h1
+                style={{
+                  color: "#00e5ff",
+                  fontSize: "clamp(1.2rem, 5vw, 1.7rem)",
+                  fontWeight: 900,
+                  margin: 0,
+                }}
+              >
+                📚 إدارة الترم والمستويات
+              </h1>
             </div>
-          )}
+            {user && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  flexWrap: "wrap",
+                }}
+              >
+                <span
+                  style={{
+                    background: "rgba(0,229,255,0.12)",
+                    color: "#00e5ff",
+                    padding: "4px 10px",
+                    borderRadius: "20px",
+                    fontSize: "0.75rem",
+                    fontWeight: 600,
+                  }}
+                >
+                  {user.name}
+                </span>
+                <span
+                  style={{
+                    background: "rgba(191,90,242,0.12)",
+                    color: "#bf5af2",
+                    padding: "4px 10px",
+                    borderRadius: "20px",
+                    fontSize: "0.75rem",
+                  }}
+                >
+                  {effectiveRole === "ADMIN" ? "أدمن" : "إدارة"}
+                </span>
+                {user.level && (
+                  <span
+                    style={{
+                      background: "rgba(255,202,40,0.12)",
+                      color: "#ffca28",
+                      padding: "4px 10px",
+                      borderRadius: "20px",
+                      fontSize: "0.75rem",
+                    }}
+                  >
+                    {user.level.replace("LEVEL_", "المستوى ")}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
 
           {loading ? (
-            <div className="text-center py-20">
-              <div className="animate-spin w-10 h-10 border-2 border-[#00e5ff] border-t-transparent rounded-full mx-auto" />
+            <div
+              style={{ textAlign: "center", padding: "60px", color: "#8b949e" }}
+            >
+              <div
+                style={{
+                  width: "40px",
+                  height: "40px",
+                  border: "3px solid rgba(0,229,255,0.2)",
+                  borderTopColor: "#00e5ff",
+                  borderRadius: "50%",
+                  animation: "spin 1s linear infinite",
+                  margin: "0 auto 16px",
+                }}
+              />
+              جاري تحميل البيانات...
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {(["LEVEL_1", "LEVEL_2"] as const).map((level) => {
-                const current = currentSemesters[level] || "TERM_1";
-                const levelLabel = level === "LEVEL_1" ? "المستوى الأول" : "المستوى الثاني";
-                const nextSemester: Semester = current === "TERM_1" ? "TERM_2" : "TERM_1";
-                const nextLabel = nextSemester === "TERM_1" ? "الترم الأول" : "الترم الثاني";
-
-                return (
-                  <div key={level} style={glassCard}>
-                    <h2 className="text-xl font-bold text-white mb-4 text-center">{levelLabel}</h2>
-                    <div className="flex items-center justify-center gap-4 mb-6">
-                      <span style={{
-                        padding: "8px 20px",
-                        borderRadius: "10px",
-                        background: current === "TERM_1"
-                          ? "rgba(0, 229, 255, 0.15)"
-                          : "rgba(57, 255, 20, 0.15)",
-                        border: `1px solid ${current === "TERM_1" ? "#00e5ff" : "#39ff14"}44`,
-                        color: current === "TERM_1" ? "#00e5ff" : "#39ff14",
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "18px",
+              }}
+            >
+              {/* حقل إدارة الترم */}
+              <div
+                onClick={() => router.push("/admin/semester/manage")}
+                style={{
+                  background: "rgba(13,17,23,0.85)",
+                  backdropFilter: "blur(16px)",
+                  WebkitBackdropFilter: "blur(16px)",
+                  border: "1px solid rgba(0,229,255,0.25)",
+                  borderRadius: "18px",
+                  padding: "22px 18px",
+                  cursor: "pointer",
+                  boxShadow: "0 6px 25px rgba(0,0,0,0.35)",
+                  width: "100%",
+                  boxSizing: "border-box",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "14px",
+                    marginBottom: "14px",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "50px",
+                      height: "50px",
+                      borderRadius: "14px",
+                      background:
+                        "linear-gradient(135deg, rgba(0,229,255,0.2), rgba(0,229,255,0.05))",
+                      border: "1px solid rgba(0,229,255,0.3)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.5rem",
+                      flexShrink: 0,
+                    }}
+                  >
+                    📅
+                  </div>
+                  <h2
+                    style={{
+                      color: "#00e5ff",
+                      fontSize: "clamp(1.1rem, 4vw, 1.3rem)",
+                      fontWeight: 800,
+                      margin: 0,
+                    }}
+                  >
+                    إدارة الترم الدراسي
+                  </h2>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "20px",
+                    marginBottom: "14px",
+                  }}
+                >
+                  <div>
+                    <span style={{ color: "#8b949e", fontSize: "0.8rem" }}>
+                      عدد المستويات
+                    </span>
+                    <div
+                      style={{
+                        color: "#00e5ff",
                         fontWeight: 700,
                         fontSize: "1.1rem",
-                      }}>
-                        {current === "TERM_1" ? "الترم الأول" : "الترم الثاني"}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => switchSemester(level, nextSemester)}
-                      disabled={switching === level}
-                      style={{
-                        width: "100%",
-                        padding: "14px",
-                        border: "none",
-                        borderRadius: "14px",
-                        background: "linear-gradient(135deg, #2188ff, #0066cc)",
-                        color: "#fff",
-                        fontWeight: 700,
-                        fontSize: "1rem",
-                        fontFamily: "'Cairo', sans-serif",
-                        cursor: switching === level ? "not-allowed" : "pointer",
-                        opacity: switching === level ? 0.6 : 1,
                       }}
                     >
-                      {switching === level ? "⚡ جاري التبديل..." : `🔄 التبديل إلى ${nextLabel}`}
-                    </button>
-                    <p className="text-[#8b949e] text-xs mt-3 text-center">
-                      عند التبديل سيتم إيقاف الرفع لمواد الترم الحالي وتفعيل مواد الترم الجديد
-                    </p>
+                      {stats?.totalLevels || 0}
+                    </div>
                   </div>
-                );
-              })}
+                  <div>
+                    <span style={{ color: "#8b949e", fontSize: "0.8rem" }}>
+                      المواد المولدة
+                    </span>
+                    <div
+                      style={{
+                        color: "#39ff14",
+                        fontWeight: 700,
+                        fontSize: "1.1rem",
+                      }}
+                    >
+                      {stats?.totalSubjects || 0}
+                    </div>
+                  </div>
+                </div>
+                <div
+                  style={{
+                    color: "#00e5ff",
+                    fontWeight: 600,
+                    fontSize: "0.9rem",
+                    textAlign: "center",
+                    padding: "10px",
+                    background: "rgba(0,229,255,0.05)",
+                    borderRadius: "10px",
+                  }}
+                >
+                  📋 إدارة المواد حسب الترم ←
+                </div>
+              </div>
+
+              {/* حقل ترقية المستويات */}
+              <div
+                onClick={() => router.push("/admin/semester/promote")}
+                style={{
+                  background: "rgba(13,17,23,0.85)",
+                  backdropFilter: "blur(16px)",
+                  WebkitBackdropFilter: "blur(16px)",
+                  border: "1px solid rgba(191,90,242,0.25)",
+                  borderRadius: "18px",
+                  padding: "22px 18px",
+                  cursor: "pointer",
+                  boxShadow: "0 6px 25px rgba(0,0,0,0.35)",
+                  width: "100%",
+                  boxSizing: "border-box",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "14px",
+                    marginBottom: "14px",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "50px",
+                      height: "50px",
+                      borderRadius: "14px",
+                      background:
+                        "linear-gradient(135deg, rgba(191,90,242,0.2), rgba(191,90,242,0.05))",
+                      border: "1px solid rgba(191,90,242,0.3)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.5rem",
+                      flexShrink: 0,
+                    }}
+                  >
+                    🎓
+                  </div>
+                  <h2
+                    style={{
+                      color: "#bf5af2",
+                      fontSize: "clamp(1.1rem, 4vw, 1.3rem)",
+                      fontWeight: 800,
+                      margin: 0,
+                    }}
+                  >
+                    ترقية المستويات
+                  </h2>
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "8px",
+                    marginBottom: "14px",
+                  }}
+                >
+                  {stats?.levelBreakdown
+                    ?.filter((l) => {
+                      if (effectiveRole === "ADMIN") return true;
+                      return l.level === userLevel;
+                    })
+                    .map((level) => (
+                      <div
+                        key={level.level}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          color: "#8b949e",
+                          fontSize: "0.85rem",
+                        }}
+                      >
+                        <span>{level.label}</span>
+                        <span style={{ color: "#bf5af2", fontWeight: 700 }}>
+                          {level.totalStudents} طالب
+                        </span>
+                      </div>
+                    ))}
+                </div>
+                <div
+                  style={{
+                    color: "#bf5af2",
+                    fontWeight: 600,
+                    fontSize: "0.9rem",
+                    textAlign: "center",
+                    padding: "10px",
+                    background: "rgba(191,90,242,0.05)",
+                    borderRadius: "10px",
+                  }}
+                >
+                  🚀 نقل الطلاب للمستوى التالي ←
+                </div>
+              </div>
             </div>
           )}
-        </motion.div>
-      </div>
+        </main>
       </PageTransition>
+      <style jsx>{`
+        @keyframes spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+      `}</style>
     </div>
   );
 }

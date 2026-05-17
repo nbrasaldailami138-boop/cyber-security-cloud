@@ -1,4 +1,5 @@
 "use client";
+
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -6,7 +7,6 @@ import dynamic from "next/dynamic";
 import MatrixRain from "@/components/effects/MatrixRain";
 import NeonParticles from "@/components/effects/NeonParticles";
 import ScanLine from "@/components/effects/ScanLine";
-import PageTransition from "@/components/layout/PageTransition";
 
 const OnboardingScene = dynamic(
   () => import("@/components/effects/OnboardingScene"),
@@ -16,87 +16,138 @@ const OnboardingScene = dynamic(
 const slides = [
   {
     id: 1,
-    title: "الفضاء السيبراني",
-    subtitle: "سحابة الأمن السيبراني",
+    title: "سحابة الأمن السيبراني",
+    subtitle: "جامعة ذمار - كلية الحاسبات",
     description:
-      "مرحباً بك في بيئة تعليمية متكاملة تجمع بين الطلاب والمعلمين والإدارة في منصة واحدة مؤمنة بأعلى معايير الحماية.",
+      "مرحباً بك في بيئة تعليمية تفاعلية متكاملة تجمع بين الطلاب والمعلمين والإدارة في منصة واحدة مؤمنة بأعلى معايير الحماية.",
     icon: "🌍",
-    side: "right",
   },
   {
     id: 2,
-    title: "دور الطالب",
-    subtitle: "قائد رحلته التعليمية",
+    title: "هويات المستخدمين",
+    subtitle: "أربعة أدوار رئيسية",
     description:
-      "ارفع تكاليفك الجامعية إلى معلمي المواد.\nراسل معلميك وإدارتك مباشرة.\nتصفح المكتبة العلمية وحمّل المحتوى.\nتابع درجاتك وملاحظات المعلمين فور صدورها.",
-    icon: "🎓",
-    side: "left",
+      "👑 الأدمن - المشرف العام على النظام\n🏢 الإدارة - مسؤول عن مستوى دراسي\n👨‍🏫 المعلم - يقيم التكاليف وينشر المحتوى\n🎓 الطالب - يرفع التكاليف ويتابع درجاته",
+    icon: "👥",
   },
   {
     id: 3,
-    title: "دور المعلم",
-    subtitle: "صانع المعرفة",
+    title: "دور الطالب",
+    subtitle: "قائد رحلته التعليمية",
     description:
-      "استقبل تكاليف طلابك وقم بتقييمها.\nانشر الملازم والمحاضرات في المكتبة العلمية.\nنشر التعميمات على طلاب مستواك.\nصدّر ووزع درجات الطلاب آلياً.",
-    icon: "👨‍🏫",
-    side: "right",
+      "📤 رفع التكاليف الجامعية إلى معلمي المواد\n💬 مراسلة المعلمين والإدارة مباشرة\n📚 تصفح المكتبة العلمية وتحميل المحتوى\n📊 متابعة الدرجات وملاحظات المعلمين",
+    icon: "🎓",
   },
   {
     id: 4,
-    title: "تفعيل الحساب",
-    subtitle: "أمان تام وحماية متقدمة",
+    title: "دور المعلم",
+    subtitle: "صانع المعرفة",
     description:
-      "بعد استلام كود التفعيل:\nأدخل بريدك الإلكتروني وكلمة المرور.\nأدخل كود التفعيل المرسل إلى بريدك.\nتمتع بكامل صلاحيات حسابك فوراً.",
-    icon: "🔐",
-    side: "left",
+      "📥 استقبال تكاليف الطلاب وتقييمها\n📚 نشر الملازم والمحاضرات في المكتبة\n📢 نشر التعميمات على طلاب مستواه\n📝 تصدير وتوزيع درجات الطلاب آلياً",
+    icon: "👨‍🏫",
   },
   {
     id: 5,
-    title: "المكتبة العلمية",
-    subtitle: "مصدرك للمعرفة",
+    title: "دور الإدارة",
+    subtitle: "منسق العملية التعليمية",
     description:
-      "كورسات يوتيوب تعليمية.\nملازم ومحاضرات قابلة للتحميل.\nملفات PDF وصور تعليمية.\nمحتوى منظم حسب مستواك الدراسي.",
-    icon: "📚",
-    side: "right",
+      "🏗️ توليد حسابات الطلاب والمعلمين\n📋 إدارة المواد الدراسية لكل ترم\n⬆️ منح صلاحيات النشر في المكتبة\n📜 مراقبة سير العملية التعليمية",
+    icon: "🏢",
   },
   {
     id: 6,
-    title: "جاهز للانطلاق",
-    subtitle: "رحلتك تبدأ الآن",
+    title: "تفعيل الحساب",
+    subtitle: "خطوة واحدة للبدء",
     description:
-      "النظام محمي بتشفير متقدم.\nمصادقة ثنائية للحماية القصوى.\nجميع معايير OWASP Top 10 مطبقة.\nبياناتك في أمان تام.",
+      "1️⃣ احصل على كود التفعيل من الإدارة\n2️⃣ أدخل بريدك الإلكتروني وكلمة المرور\n3️⃣ أدخل كود التفعيل المرسل إليك\n4️⃣ تمتع بكامل صلاحيات حسابك فوراً",
+    icon: "🔐",
+  },
+  {
+    id: 7,
+    title: "نسيت كلمة المرور",
+    subtitle: "استعادة سهلة وآمنة",
+    description:
+      "📧 أدخل بريدك الإلكتروني\n📨 استلم كود التحقق على بريدك\n🔑 عيّن كلمة مرور جديدة\n✅ سجّل دخولك بشكل طبيعي",
+    icon: "🔑",
+  },
+  {
+    id: 8,
+    title: "المكتبة العلمية",
+    subtitle: "مصدرك للمعرفة",
+    description:
+      "🎥 كورسات يوتيوب تعليمية\n📄 ملازم ومحاضرات قابلة للتحميل\n🖼️ ملفات PDF وصور تعليمية\n🔍 محتوى منظم حسب مستواك الدراسي",
+    icon: "📚",
+  },
+  {
+    id: 9,
+    title: "رفع التكاليف",
+    subtitle: "بكل سهولة وأمان",
+    description:
+      "📌 اختر المادة الدراسية من القائمة\n📎 ارفع ملف التكليف من جهازك\n🛡️ يتم فحص الملف من الفيروسات تلقائياً\n📤 يصلك تقييم المعلم مع ملاحظاته",
+    icon: "📤",
+  },
+  {
+    id: 10,
+    title: "تقييم وتصدير الدرجات",
+    subtitle: "نظام متكامل للمعلمين",
+    description:
+      "📥 استقبل تكاليف الطلاب وقيمها\n📊 ارفع ملف درجات (Excel - PDF - صورة)\n🤖 يحلل النظام الملف ويطابق الأسماء\n📢 تنشر الدرجات للطلاب فور اعتمادك",
+    icon: "📊",
+  },
+  {
+    id: 11,
+    title: "أمان وحماية",
+    subtitle: "بأعلى المعايير العالمية",
+    description:
+      "🔒 تشفير Argon2id لكلمات المرور\n🛡️ حماية CSRF و XSS و SQL Injection\n🔐 مصادقة ثنائية (2FA)\n🕵️ كشف التسلل والهجمات التلقائي",
+    icon: "🛡️",
+  },
+  {
+    id: 12,
+    title: "هل أنت مستعد؟",
+    subtitle: "رحلتك التعليمية تبدأ الآن",
+    description:
+      "كل شيء جاهز لاستقبالك\nانطلق في رحلتك مع سحابة الأمن السيبراني\nنتمنى لك التوفيق والنجاح",
     icon: "🚀",
-    side: "center",
   },
 ];
 
 export default function OnboardingPage() {
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [finished, setFinished] = useState(false);
+  const [direction, setDirection] = useState(1);
   const router = useRouter();
 
+  const totalSlides = slides.length;
+  const isLast = currentSlide === totalSlides - 1;
+
+  const goToSlide = useCallback(
+    (index: number) => {
+      setDirection(index > currentSlide ? 1 : -1);
+      setCurrentSlide(index);
+    },
+    [currentSlide],
+  );
+
   const nextSlide = useCallback(() => {
-    if (currentSlide < slides.length - 1) {
-      setCurrentSlide((prev) => prev + 1);
-    } else {
-      // انتقال تلقائي بعد آخر سلايد مع تأثير
+    if (isLast) {
       localStorage.setItem("onboardingSeen", "true");
       setTimeout(() => {
         router.push("/login");
-      }, 1500);
+      }, 500);
+    } else {
+      goToSlide(currentSlide + 1);
     }
-  }, [currentSlide, router]);
+  }, [isLast, currentSlide, goToSlide, router]);
 
-  const prevSlide = () => {
-    if (currentSlide > 0) setCurrentSlide((prev) => prev - 1);
-  };
+  const prevSlide = useCallback(() => {
+    if (currentSlide > 0) goToSlide(currentSlide - 1);
+  }, [currentSlide, goToSlide]);
 
   const handleSkip = () => {
     localStorage.setItem("onboardingSeen", "true");
     router.push("/login");
   };
 
-  // التنقل بلوحة المفاتيح
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowRight") nextSlide();
@@ -105,286 +156,339 @@ export default function OnboardingPage() {
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [currentSlide, nextSlide]);
+  }, [nextSlide, prevSlide]);
 
-  // ==================== نافذة تسجيل الدخول النهائية ====================
-  if (finished) {
-    return (
-      <main className="relative min-h-screen flex items-center justify-center overflow-hidden bg-bg-space">
-        <div className="absolute inset-0 quantum-grid z-0" />
-        <MatrixRain />
-        <NeonParticles />
-        <ScanLine />
-
-        {/* كرة أرضية في الخلفية */}
-        <motion.div
-          initial={{ x: -300, opacity: 0 }}
-          animate={{ x: -100, opacity: 0.6 }}
-          transition={{ duration: 1.2, ease: "easeOut" }}
-          className="absolute z-10 hidden lg:block"
-          style={{ left: "5%" }}
-        >
-          <OnboardingScene showCard={false} />
-        </motion.div>
-
-        {/* اسم الموقع */}
-        <motion.h1
-          initial={{ opacity: 0, y: -40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4, duration: 0.8 }}
-          className="absolute top-10 z-20 text-center w-full font-bold font-arabic px-4"
-          style={{
-            fontSize: "clamp(1.5rem, 5vw, 2.8rem)",
-            color: "#00e5ff",
-            textShadow:
-              "0 0 10px rgba(0, 229, 255, 0.8), 0 0 30px rgba(0, 229, 255, 0.5)",
-            letterSpacing: "1px",
-          }}
-        >
-          سحابة الأمن السيبراني
-        </motion.h1>
-
-        {/* بطاقة تسجيل الدخول - محسنة للجوال */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8, y: 50 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ delay: 0.3, duration: 0.6, type: "spring" }}
-          className="relative z-30 w-[90%] max-w-[420px] px-4"
-        >
-          <div className="glass-card p-6 sm:p-8 md:p-10 text-center neon-border rounded-3xl border border-white/10 bg-black/40 backdrop-blur-xl">
-            {/* أيقونة القفل */}
-            <motion.div
-              className="text-6xl mb-5"
-              animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
-              transition={{ duration: 3, repeat: Infinity }}
-            >
-              🔒
-            </motion.div>
-
-            <h2
-              className="text-2xl sm:text-3xl font-bold mb-2 font-arabic"
-              style={{
-                background: "linear-gradient(to bottom, #fff, #a5b4fc)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-              }}
-            >
-              تسجيل الدخول
-            </h2>
-            <p className="text-gray-400 mb-8 font-arabic text-sm sm:text-base">
-              مرحباً بعودتك إلى منصتك التعليمية
-            </p>
-
-            <button
-              onClick={() => {
-                localStorage.setItem("onboardingSeen", "true");
-                router.push("/login");
-              }}
-              className="w-full mb-4 py-4 text-lg font-bold rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 transition-all duration-300 shadow-lg hover:shadow-indigo-500/40 active:scale-95"
-            >
-              🚀 تسجيل الدخول
-            </button>
-          </div>
-        </motion.div>
-      </main>
-    );
-  }
-
-  // ==================== عرض الشرائح ====================
   const current = slides[currentSlide];
-  const isRight = current.side === "right";
-  const isCenter = current.side === "center";
+
+  const slideVariants = {
+    enter: (dir: number) => ({
+      x: dir > 0 ? 300 : -300,
+      opacity: 0,
+      scale: 0.9,
+    }),
+    center: {
+      x: 0,
+      opacity: 1,
+      scale: 1,
+    },
+    exit: (dir: number) => ({
+      x: dir > 0 ? -300 : 300,
+      opacity: 0,
+      scale: 0.9,
+    }),
+  };
 
   return (
-    <PageTransition>
-    <main className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-bg-space">
-      {/* خلفيات */}
+    <main
+      style={{
+        minHeight: "100vh",
+        background: "#010204",
+        fontFamily: "'Cairo', sans-serif",
+        color: "#fff",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      {/* طبقات الخلفية */}
       <div className="absolute inset-0 quantum-grid z-0" />
       <MatrixRain />
       <NeonParticles />
       <ScanLine />
 
-      {/* الكرة الأرضية */}
-      <div className="absolute inset-0 z-10 opacity-40 md:opacity-100">
+      {/* الكرة الأرضية في الخلفية */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 1,
+          opacity: 0.25,
+        }}
+      >
         <OnboardingScene showCard={false} />
       </div>
 
-      {/* زر تخطي - محسن للجوال */}
-      <motion.button
-        onClick={handleSkip}
-        className="absolute top-6 right-4 sm:right-6 z-50 px-4 py-2 text-sm font-arabic rounded-full bg-white/5 border border-white/10 backdrop-blur-md hover:bg-white/10 transition-colors"
-        whileTap={{ scale: 0.95 }}
+      {/* هيدر علوي */}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 50,
+          padding: "16px 20px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
       >
-        تخطي ←
-      </motion.button>
-
-      {/* شريط التقدم العلوي (بديل النقاط) */}
-      <div className="absolute top-6 left-4 sm:left-6 right-20 sm:right-24 z-50 h-1.5 bg-white/10 rounded-full overflow-hidden">
-        <motion.div
-          className="h-full bg-gradient-to-r from-cyan-400 to-indigo-500 rounded-full"
-          initial={{ width: "0%" }}
-          animate={{
-            width: `${((currentSlide + 1) / slides.length) * 100}%`,
+        <h2
+          style={{
+            color: "#00e5ff",
+            fontSize: "clamp(0.9rem, 3vw, 1.1rem)",
+            fontWeight: 700,
+            margin: 0,
+            textShadow: "0 0 15px rgba(0,229,255,0.4)",
           }}
-          transition={{ duration: 0.5, ease: "easeInOut" }}
-        />
+        >
+          جامعة ذمار - كلية الحاسبات
+        </h2>
+
+        <button
+          onClick={handleSkip}
+          style={{
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.15)",
+            borderRadius: "25px",
+            padding: "8px 18px",
+            color: "#8b949e",
+            cursor: "pointer",
+            fontSize: "0.85rem",
+            fontFamily: "'Cairo', sans-serif",
+            fontWeight: 600,
+            backdropFilter: "blur(10px)",
+            transition: "all 0.3s",
+          }}
+        >
+          تخطي ←
+        </button>
       </div>
 
-      {/* ========================================= */}
-      {/* عرض سطح المكتب (Hidden on Mobile) */}
-      {/* ========================================= */}
-      <AnimatePresence mode="wait">
-        {!isCenter ? (
+      {/* شريط التقدم */}
+      <div
+        style={{
+          position: "absolute",
+          top: "70px",
+          left: "20px",
+          right: "20px",
+          zIndex: 50,
+          display: "flex",
+          gap: "6px",
+          justifyContent: "center",
+        }}
+      >
+        {slides.map((_, idx) => (
+          <button
+            key={idx}
+            onClick={() => goToSlide(idx)}
+            style={{
+              height: "4px",
+              borderRadius: "2px",
+              border: "none",
+              cursor: "pointer",
+              transition: "all 0.4s ease",
+              background:
+                idx === currentSlide
+                  ? "#00e5ff"
+                  : idx < currentSlide
+                    ? "rgba(0,229,255,0.4)"
+                    : "rgba(255,255,255,0.15)",
+              width: idx === currentSlide ? "28px" : "12px",
+            }}
+          />
+        ))}
+      </div>
+
+      {/* المحتوى الرئيسي - عرض الجوال */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 40,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "100px 16px 120px",
+        }}
+      >
+        <AnimatePresence mode="wait" custom={direction}>
           <motion.div
             key={currentSlide}
-            initial={{ opacity: 0, x: isRight ? 100 : -100, scale: 0.85 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: isRight ? -100 : 100, scale: 0.85 }}
-            transition={{ duration: 0.5, type: "spring", stiffness: 120 }}
-            className={`absolute top-1/2 -translate-y-1/2 z-40 hidden md:block ${
-              isRight ? "right-8 lg:right-20" : "left-8 lg:left-20"
-            }`}
+            custom={direction}
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.45, ease: "easeInOut" }}
+            style={{
+              width: "100%",
+              maxWidth: "500px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              textAlign: "center",
+            }}
           >
-            <div className="glass-card p-8 w-[360px] lg:w-[400px] text-center neon-border rounded-3xl border border-white/10 bg-black/50 backdrop-blur-xl">
-              {/* أيقونة */}
-              <motion.div
-                className="text-7xl mb-6"
-                animate={{ y: [0, -10, 0] }}
-                transition={{
-                  duration: 3,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-              >
-                {current.icon}
-              </motion.div>
+            {/* الأيقونة */}
+            <motion.div
+              animate={{
+                y: [0, -12, 0],
+                scale: [1, 1.08, 1],
+              }}
+              transition={{
+                duration: 4,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+              style={{
+                fontSize: "clamp(3.5rem, 12vw, 5rem)",
+                marginBottom: "20px",
+                filter: "drop-shadow(0 0 30px rgba(0,229,255,0.3))",
+              }}
+            >
+              {current.icon}
+            </motion.div>
 
-              <h2 className="text-3xl font-bold text-white mb-2 font-arabic drop-shadow-lg">
-                {current.title}
-              </h2>
-              <p className="text-indigo-300 text-sm mb-4 font-mono uppercase tracking-widest">
-                {current.subtitle}
-              </p>
-              <div className="w-20 h-px bg-indigo-500/50 mx-auto mb-5" />
-              <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-line font-arabic">
-                {current.description}
-              </p>
-            </div>
-          </motion.div>
-        ) : (
-          // عرض مركزي لسلايد النهاية (Desktop)
-          <motion.div
-            key={currentSlide}
-            initial={{ opacity: 0, scale: 0.8, y: 30 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.8, y: -30 }}
-            transition={{ duration: 0.5 }}
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 hidden md:block"
-          >
-            <div className="glass-card p-10 w-[400px] text-center neon-border rounded-3xl border border-white/10 bg-black/50 backdrop-blur-xl">
-              <motion.div
-                className="text-8xl mb-6"
-                animate={{ scale: [1, 1.1, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
-                {current.icon}
-              </motion.div>
-              <h2 className="text-3xl font-bold text-white mb-2 font-arabic">
-                {current.title}
-              </h2>
-              <p className="text-indigo-300 text-sm mb-4 font-mono">
-                {current.subtitle}
-              </p>
-              <div className="w-20 h-px bg-indigo-500/50 mx-auto mb-5" />
-              <p className="text-gray-300 text-base leading-relaxed whitespace-pre-line font-arabic">
-                {current.description}
-              </p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            {/* العنوان */}
+            <h1
+              style={{
+                color: "#00e5ff",
+                fontSize: "clamp(1.3rem, 5vw, 2rem)",
+                fontWeight: 900,
+                margin: "0 0 6px",
+                textShadow: "0 0 25px rgba(0,229,255,0.5)",
+                lineHeight: 1.3,
+              }}
+            >
+              {current.title}
+            </h1>
 
-      {/* ========================================= */}
-      {/* عرض الجوال (Mobile First - Priority) */}
-      {/* ========================================= */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={`mobile-${currentSlide}`}
-          initial={{ opacity: 0, y: 80, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -80, scale: 0.95 }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
-          className="absolute bottom-0 left-0 right-0 z-40 md:hidden pt-4 pb-6 px-4"
-        >
-          <div className="relative w-full bg-gradient-to-t from-black/90 via-black/70 to-transparent pt-10 pb-4">
-            {/* البطاقة الزجاجية للجوال */}
-            <div className="glass-card w-full p-6 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-lg shadow-2xl relative overflow-hidden">
-              {/* زخرفة داخلية */}
-              <div className="absolute top-0 right-0 w-20 h-20 bg-indigo-500/10 blur-2xl rounded-full" />
+            {/* العنوان الفرعي */}
+            <p
+              style={{
+                color: "#bf5af2",
+                fontSize: "clamp(0.75rem, 3vw, 0.9rem)",
+                fontWeight: 600,
+                margin: "0 0 16px",
+                letterSpacing: "2px",
+              }}
+            >
+              {current.subtitle}
+            </p>
 
-              <div className="relative z-10 flex flex-col items-center text-center">
-                {/* الأيقونة */}
-                <motion.div
-                  className="text-6xl mb-4 drop-shadow-lg"
-                  animate={{ scale: [1, 1.15, 1] }}
-                  transition={{ duration: 2.5, repeat: Infinity }}
+            {/* فاصل */}
+            <div
+              style={{
+                width: "50px",
+                height: "2px",
+                background:
+                  "linear-gradient(90deg, transparent, #00e5ff, transparent)",
+                marginBottom: "20px",
+              }}
+            />
+
+            {/* الوصف */}
+            <div
+              style={{
+                background: "rgba(13,17,23,0.7)",
+                backdropFilter: "blur(15px)",
+                WebkitBackdropFilter: "blur(15px)",
+                border: "1px solid rgba(48,54,61,0.5)",
+                borderRadius: "18px",
+                padding: "clamp(16px, 4vw, 24px)",
+                width: "100%",
+                boxSizing: "border-box",
+              }}
+            >
+              {current.description.split("\n").map((line, i) => (
+                <p
+                  key={i}
+                  style={{
+                    color: "#e6edf3",
+                    fontSize: "clamp(0.85rem, 3.5vw, 1rem)",
+                    lineHeight: 1.9,
+                    margin: "0 0 4px",
+                    textAlign: "right",
+                  }}
                 >
-                  {current.icon}
-                </motion.div>
-
-                {/* العنوان */}
-                <h2 className="text-2xl font-bold text-white mb-1 font-arabic tracking-wide">
-                  {current.title}
-                </h2>
-
-                {/* العنوان الفرعي */}
-                <p className="text-indigo-300 text-xs mb-4 font-mono tracking-wider uppercase">
-                  {current.subtitle}
+                  {line}
                 </p>
-
-                {/* فاصل */}
-                <div className="w-16 h-px bg-indigo-400/30 mb-4" />
-
-                {/* الوصف */}
-                <p className="text-gray-200 text-sm leading-relaxed whitespace-pre-line font-arabic mb-4">
-                  {current.description}
-                </p>
-
-                {/* رقم الصفحة */}
-                <div className="absolute bottom-2 left-4 text-[10px] text-gray-500 font-mono">
-                  {currentSlide + 1} / {slides.length}
-                </div>
-              </div>
+              ))}
             </div>
-          </div>
-        </motion.div>
-      </AnimatePresence>
 
-      {/* أزرار التنقل - محسنة للجوال والديسكتوب */}
-      <div className="absolute bottom-4 left-0 right-0 z-50 flex justify-center items-center gap-3 px-4 pb-2 md:pb-0 md:bottom-10">
-        <motion.button
+            {/* عداد الشرائح */}
+            <p
+              style={{
+                color: "#8b949e",
+                fontSize: "0.75rem",
+                marginTop: "16px",
+              }}
+            >
+              {currentSlide + 1} / {totalSlides}
+            </p>
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* أزرار التنقل السفلية */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          zIndex: 50,
+          padding: "16px 16px 28px",
+          display: "flex",
+          gap: "12px",
+          alignItems: "center",
+          justifyContent: "center",
+          background:
+            "linear-gradient(to top, rgba(1,2,4,0.95) 0%, rgba(1,2,4,0.7) 60%, transparent 100%)",
+        }}
+      >
+        {/* زر السابق */}
+        <button
           onClick={prevSlide}
           disabled={currentSlide === 0}
-          whileTap={{ scale: 0.95 }}
-          className={`px-5 py-3 rounded-xl font-arabic text-sm border border-white/10 backdrop-blur-md transition-colors ${
-            currentSlide === 0
-              ? "opacity-30 cursor-not-allowed bg-white/5"
-              : "bg-white/10 hover:bg-white/20"
-          }`}
+          style={{
+            width: "48px",
+            height: "48px",
+            borderRadius: "14px",
+            border: "1px solid rgba(255,255,255,0.1)",
+            background:
+              currentSlide === 0
+                ? "rgba(255,255,255,0.02)"
+                : "rgba(255,255,255,0.06)",
+            color: currentSlide === 0 ? "#3a3f47" : "#8b949e",
+            cursor: currentSlide === 0 ? "not-allowed" : "pointer",
+            fontSize: "1.2rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontFamily: "'Cairo', sans-serif",
+            transition: "all 0.3s",
+            flexShrink: 0,
+          }}
         >
-          ← السابق
-        </motion.button>
+          ←
+        </button>
 
-        <motion.button
+        {/* زر التالي / إنهاء */}
+        <button
           onClick={nextSlide}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="flex-1 md:flex-none px-8 py-3.5 text-base font-bold font-arabic rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 shadow-lg hover:shadow-indigo-500/30 active:scale-95 transition-all"
+          style={{
+            flex: 1,
+            height: "52px",
+            borderRadius: "14px",
+            border: "none",
+            background: isLast
+              ? "linear-gradient(135deg, #00e5ff, #007bff)"
+              : "linear-gradient(135deg, rgba(0,229,255,0.2), rgba(0,229,255,0.05))",
+            borderImage: isLast ? "none" : "1px solid rgba(0,229,255,0.3)",
+            border: isLast ? "none" : "1px solid rgba(0,229,255,0.3)",
+            color: isLast ? "#010204" : "#00e5ff",
+            cursor: "pointer",
+            fontSize: "1rem",
+            fontWeight: 700,
+            fontFamily: "'Cairo', sans-serif",
+            boxShadow: isLast ? "0 8px 30px rgba(0,229,255,0.3)" : "none",
+            transition: "all 0.3s",
+          }}
         >
-          {currentSlide === slides.length - 1 ? "✨" : "التالي →"}
-        </motion.button>
+          {isLast ? "🚀 تسجيل الدخول" : "التالي →"}
+        </button>
       </div>
     </main>
-    </PageTransition>
   );
 }

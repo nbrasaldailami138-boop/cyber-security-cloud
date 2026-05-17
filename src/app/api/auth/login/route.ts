@@ -109,7 +109,39 @@ export async function POST(request: NextRequest) {
       // زيادة عداد المحاولات الفاشلة
       const failedAttempts = user.failedLoginAttempts + 1;
       const maxAttempts = 5;
-      const shouldLock = failedAttempts >= maxAttempts;
+      // نظام المحاولات المتدرج
+      // المرحلة 1: 5 محاولات → حظر 7 دقائق
+      // المرحلة 2: 3 محاولات → حظر 15 دقيقة
+      // المرحلة 3: 1 محاولة → حظر أسبوع + اعتبار اختراق
+      let lockDurationMinutes = 7; // افتراضي للمرحلة الأولى
+      let isBreachAttempt = false;
+      let previousLockCount = 0;
+
+      // جلب عدد مرات الحظر السابقة من سجل التدقيق
+      const previousLocks = await prisma.auditLog.count({
+        where: {
+          userId: user.id,
+          action: "SUSPICIOUS_ACTIVITY",
+          description: { contains: "حظر" },
+        },
+      });
+
+      if (previousLocks >= 2) {
+        // المرحلة الثالثة: محاولة واحدة فقط
+        lockDurationMinutes = 10080; // أسبوع
+        isBreachAttempt = true;
+      } else if (previousLocks >= 1) {
+        // المرحلة الثانية: 3 محاولات
+        lockDurationMinutes = 15;
+      } else {
+        // المرحلة الأولى: 5 محاولات
+        lockDurationMinutes = 7;
+      }
+
+      const shouldLock =
+        (previousLocks >= 2 && failedAttempts >= 1) ||
+        (previousLocks >= 1 && failedAttempts >= 3) ||
+        failedAttempts >= maxAttempts;
 
       await prisma.user.update({
         where: { id: user.id },
@@ -117,23 +149,155 @@ export async function POST(request: NextRequest) {
           failedLoginAttempts: failedAttempts,
           status: shouldLock ? "LOCKED" : user.status,
           lockedUntil: shouldLock
-            ? new Date(Date.now() + 15 * 60 * 1000)
+            ? new Date(Date.now() + lockDurationMinutes * 60 * 1000)
             : null,
         },
       });
 
-      await prisma.auditLog.create({
+      // تسجيل محاولة الفشل
+      const failedLog = await prisma.auditLog.create({
         data: {
           userId: user.id,
           action: "FAILED_LOGIN",
-          severity: "WARNING",
-          description: `محاولة دخول فاشلة (${failedAttempts}/${maxAttempts})`,
+          severity: shouldLock ? "CRITICAL" : "WARNING",
+          description: `محاولة دخول فاشلة (${failedAttempts}/${previousLocks >= 2 ? 1 : previousLocks >= 1 ? 3 : maxAttempts}) - المرحلة ${previousLocks >= 2 ? 3 : previousLocks >= 1 ? 2 : 1}`,
           ipAddress: ip,
+          deviceInfo: request.headers.get("user-agent") || "",
         },
       });
 
+      // إرسال حدث Pusher لتحديث صفحات الرادار لحظياً
+      try {
+        const { pusher: pusherServer } = await import("@/lib/pusher");
+        await pusherServer.trigger("security-terminal", "new-log", {
+          id: failedLog.id,
+          action: failedLog.action,
+          severity: failedLog.severity,
+          description: failedLog.description,
+          ipAddress: failedLog.ipAddress,
+          deviceInfo: failedLog.deviceInfo,
+          createdAt: failedLog.createdAt.toISOString(),
+        });
+        await pusherServer.trigger("security-radar", "stats-update", {
+          timestamp: new Date().toISOString(),
+        });
+        await pusherServer.trigger("security-guardian", "new-threat", {
+          id: failedLog.id,
+          action: failedLog.action,
+          severity: failedLog.severity,
+          description: failedLog.description,
+          ipAddress: failedLog.ipAddress,
+          deviceInfo: failedLog.deviceInfo,
+          createdAt: failedLog.createdAt.toISOString(),
+          user: { name: user.name, email: user.email, role: user.role },
+        });
+      } catch (pusherError) {
+        console.error("Failed to send Pusher event:", pusherError);
+      }
+      // إذا تم اعتبارها محاولة اختراق
+      // إذا تم اعتبارها محاولة اختراق
+      if (isBreachAttempt && shouldLock) {
+        const auditLog = await prisma.auditLog.create({
+          data: {
+            userId: user.id,
+            action: "SUSPICIOUS_ACTIVITY",
+            severity: "CRITICAL",
+            description: `🚨 محاولة اختراق - حظر أسبوع للمستخدم ${user.email} من IP ${ip}`,
+            ipAddress: ip,
+            deviceInfo: request.headers.get("user-agent") || "",
+          },
+        });
+
+        // إرسال إشعار داخلي للأدمن
+        try {
+          const admins = await prisma.user.findMany({
+            where: { role: "ADMIN", deletedAt: null },
+            select: { id: true },
+          });
+
+          for (const admin of admins) {
+            await prisma.notification.create({
+              data: {
+                userId: admin.id,
+                type: "NEW_ANNOUNCEMENT",
+                title: "🚨 محاولة اختراق",
+                body: `محاولة اختراق على الحساب ${user.email} من IP ${ip}`,
+                linkUrl: "/admin/security-radar/guardian",
+              },
+            });
+          }
+
+          // إرسال حدث Pusher للإشعارات
+          const { pusher } = await import("@/lib/pusher");
+          await pusher.trigger("security-guardian", "new-threat", {
+            id: auditLog.id,
+            action: auditLog.action,
+            severity: auditLog.severity,
+            description: auditLog.description,
+            ipAddress: auditLog.ipAddress,
+            deviceInfo: auditLog.deviceInfo,
+            createdAt: auditLog.createdAt.toISOString(),
+            user: { name: user.name, email: user.email, role: user.role },
+          });
+
+          // تحديث الإحصائيات
+          await pusher.trigger("security-radar", "stats-update", {
+            timestamp: new Date().toISOString(),
+          });
+
+          // إرسال إشعار خارجي (Push Notification) للأدمن
+          const { sendPushNotification } =
+            await import("@/lib/pushNotifications");
+          for (const admin of admins) {
+            await sendPushNotification(
+              admin.id,
+              "🚨 محاولة اختراق",
+              `محاولة اختراق على الحساب ${user.email} من IP ${ip}`,
+              "/admin/security-radar/guardian",
+            ).catch(() => {});
+          }
+        } catch (pusherError) {
+          console.error("Failed to send Pusher event:", pusherError);
+        }
+
+        // إرسال إيميل تحذيري للأدمن
+        try {
+          const { sendEmail } = await import("@/lib/email");
+          await sendEmail({
+            to: "nbrasalsma@gmail.com",
+            subject: "🚨 تحذير أمني - محاولة اختراق - سحابة الأمن السيبراني",
+            html: `
+              <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; background: #0d1117; color: #e6edf3; padding: 20px; border-radius: 12px; border: 1px solid #ff3131;">
+                <h2 style="color: #ff3131;">🚨 تحذير أمني - محاولة اختراق</h2>
+                <p><strong>المستخدم المستهدف:</strong> ${user.email}</p>
+                <p><strong>IP المهاجم:</strong> ${ip}</p>
+                <p><strong>عدد المحاولات:</strong> ${failedAttempts}</p>
+                <p><strong>الإجراء:</strong> تم حظر الحساب لمدة أسبوع</p>
+                <p><strong>الوقت:</strong> ${new Date().toLocaleString("ar-YE")}</p>
+                <hr style="border-color: rgba(255,49,49,0.3);" />
+                <p style="color: #8b949e; font-size: 0.85rem;">سحابة الأمن السيبراني - جامعة ذمار</p>
+              </div>
+            `,
+          });
+        } catch (emailError) {
+          console.error("Failed to send security alert email:", emailError);
+        }
+      }
+
+      // رسالة مخصصة حسب المرحلة
+      let errorMessage = "البيانات المدخلة غير صحيحة";
+      if (shouldLock) {
+        if (isBreachAttempt) {
+          errorMessage = "تم حظر الحساب لمدة أسبوع بسبب محاولات اختراق متكررة";
+        } else if (previousLocks >= 1) {
+          errorMessage = `تم حظر الحساب لمدة ${lockDurationMinutes} دقيقة. حاول مرة أخرى لاحقاً.`;
+        } else {
+          errorMessage = `تم حظر الحساب لمدة ${lockDurationMinutes} دقائق. حاول مرة أخرى لاحقاً.`;
+        }
+      }
+
       return NextResponse.json(
-        { success: false, message: "البيانات المدخلة غير صحيحة" },
+        { success: false, message: errorMessage },
         { status: 401 },
       );
     }
