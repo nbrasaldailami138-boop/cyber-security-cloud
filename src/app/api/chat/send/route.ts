@@ -16,6 +16,7 @@ const purify = DOMPurify(window as any);
 const messageSchema = z.object({
   receiverId: z.string().min(1, "المستقبل مطلوب"),
   body: z.string().min(1, "الرسالة فارغة").max(2000, "الرسالة طويلة جداً"),
+  replyToId: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let { receiverId, body: messageBody } = validation.data;
+    let { receiverId, body: messageBody, replyToId } = validation.data;
 
     // تعقيم الرسالة من XSS
     messageBody = purify.sanitize(messageBody, { ALLOWED_TAGS: [] });
@@ -119,57 +120,84 @@ export async function POST(request: NextRequest) {
         receiverId,
         body: encryptedBody,
         encrypted: true,
+        ...(replyToId ? { replyToId } : {}),
       },
     });
 
-    // تحديث آخر ظهور للمرسل
-    await prisma.user.update({
-      where: { id: senderId },
-      data: { lastSeenAt: new Date() },
-    });
+    // تحديث آخر ظهور للمرسل (غير متزامن)
+    prisma.user
+      .update({
+        where: { id: senderId },
+        data: { lastSeenAt: new Date() },
+      })
+      .catch(() => {});
 
-    // إنشاء إشعار
-    const notification = await prisma.notification.create({
-      data: {
-        userId: receiverId,
-        type: "NEW_MESSAGE",
-        title: "رسالة جديدة",
-        body: `رسالة جديدة من ${sender.name}`,
-        linkUrl: "/chat",
-      },
-    });
+    // التحقق من حالة المستخدم: هل هو في نفس المحادثة؟
+    let isInChatWithSender = false;
+    try {
+      const userStatus = await prisma.user.findUnique({
+        where: { id: receiverId },
+        select: { lastSeenAt: true },
+      });
+      // إذا كان آخر ظهور للمستخدم خلال آخر دقيقتين، نعتبره داخل المحادثة
+      if (
+        userStatus?.lastSeenAt &&
+        Date.now() - new Date(userStatus.lastSeenAt).getTime() < 2 * 60 * 1000
+      ) {
+        isInChatWithSender = true;
+      }
+    } catch {}
 
-    // إرسال إشعار فوري عبر Pusher
-    await triggerNewMessage(senderId, receiverId, {
+    // إنشاء إشعار (غير متزامن - لا ننتظره)
+    prisma.notification
+      .create({
+        data: {
+          userId: receiverId,
+          type: "NEW_MESSAGE",
+          title: "رسالة جديدة",
+          body: `رسالة جديدة من ${sender.name}`,
+          linkUrl: "/chat",
+        },
+      })
+      .catch(() => {});
+
+    // إرسال إشعار فوري عبر Pusher (غير متزامن) - هذا ضروري لتحديث الواجهة
+    triggerNewMessage(senderId, receiverId, {
       id: message.id,
       body: messageBody,
       createdAt: message.createdAt.toISOString(),
       sender: { id: senderId, name: sender.name },
-    });
-    await triggerNotification(receiverId, {
-      id: notification.id,
-      type: "NEW_MESSAGE",
-      title: "رسالة جديدة",
-      body: `رسالة جديدة من ${sender.name}`,
-      linkUrl: "/chat",
-    });
-    // إرسال Push Notification خارجي
-    await sendPushNotification(
-      receiverId,
-      "💬 رسالة جديدة",
-      `رسالة جديدة من ${sender.name}`,
-      "/chat",
-    );
-    // إرسال Push مع صوت
-    try {
-      const { sendPushToUsers } = await import("@/lib/pushNotifications");
-      await sendPushToUsers([receiverId], {
-        title: "💬 رسالة جديدة",
+    }).catch(() => {});
+
+    // إرسال الإشعارات المنبثقة والخارجية فقط إذا لم يكن المستقبل داخل المحادثة
+    if (!isInChatWithSender) {
+      triggerNotification(receiverId, {
+        id: message.id,
+        type: "NEW_MESSAGE",
+        title: "رسالة جديدة",
         body: `رسالة جديدة من ${sender.name}`,
-        data: { url: "/chat" },
-        sound: "/sounds/notification.mp3",
-      });
-    } catch {}
+        linkUrl: "/chat",
+      }).catch(() => {});
+
+      sendPushNotification(
+        receiverId,
+        "💬 رسالة جديدة",
+        `رسالة جديدة من ${sender.name}`,
+        "/chat",
+      ).catch(() => {});
+
+      import("@/lib/pushNotifications")
+        .then(({ sendPushToUsers }) => {
+          sendPushToUsers([receiverId], {
+            title: "💬 رسالة جديدة",
+            body: `رسالة جديدة من ${sender.name}`,
+            data: { url: "/chat" },
+            sound: "/sounds/notification.mp3",
+          }).catch(() => {});
+        })
+        .catch(() => {});
+    }
+
     return NextResponse.json({
       success: true,
       message: "تم إرسال الرسالة",

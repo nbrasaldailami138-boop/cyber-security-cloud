@@ -44,9 +44,25 @@ export async function GET(request: NextRequest) {
         orderBy: { createdAt: "desc" },
         take: 100,
         include: {
-          sender: { select: { id: true, name: true, role: true, level: true } },
+          sender: {
+            select: {
+              id: true,
+              name: true,
+              role: true,
+              level: true,
+              lastSeenAt: true,
+              lastLoginAt: true,
+            },
+          },
           receiver: {
-            select: { id: true, name: true, role: true, level: true },
+            select: {
+              id: true,
+              name: true,
+              role: true,
+              level: true,
+              lastSeenAt: true,
+              lastLoginAt: true,
+            },
           },
         },
       });
@@ -65,6 +81,8 @@ export async function GET(request: NextRequest) {
             name: other.name,
             role: other.role,
             level: other.level,
+            lastSeenAt: other.lastSeenAt,
+            lastLoginAt: other.lastLoginAt,
             lastMessage: body.slice(0, 50),
             createdAt: msg.createdAt,
             isRead: msg.isRead,
@@ -78,12 +96,21 @@ export async function GET(request: NextRequest) {
       // جلب رسائل محادثة محددة
       const messages = await prisma.message.findMany({
         where: {
-          OR: [
-            { senderId: userId, receiverId: otherUserId, senderDeleted: false },
+          AND: [
+            { deletedAt: null },
             {
-              senderId: otherUserId,
-              receiverId: userId,
-              receiverDeleted: false,
+              OR: [
+                {
+                  senderId: userId,
+                  receiverId: otherUserId,
+                  senderDeleted: false,
+                },
+                {
+                  senderId: otherUserId,
+                  receiverId: userId,
+                  receiverDeleted: false,
+                },
+              ],
             },
           ],
         },
@@ -91,20 +118,52 @@ export async function GET(request: NextRequest) {
         take: 100,
         include: {
           sender: { select: { id: true, name: true } },
+          replyTo: {
+            select: {
+              id: true,
+              body: true,
+              sender: { select: { id: true, name: true } },
+            },
+          },
         },
       });
 
-      // فك تشفير الرسائل
+      // فك تشفير الرسائل (بما في ذلك نص الرد)
       const decrypted = messages.map((msg) => ({
         ...msg,
         body: msg.encrypted ? decryptMessage(msg.body) : msg.body,
+        replyTo: msg.replyTo
+          ? {
+              ...msg.replyTo,
+              body: msg.replyTo.body
+                ? (() => {
+                    try {
+                      return decryptMessage(msg.replyTo.body);
+                    } catch {
+                      return msg.replyTo.body;
+                    }
+                  })()
+                : "",
+            }
+          : null,
       }));
 
       // تحديث الرسائل كمقروءة
-      await prisma.message.updateMany({
+      const updatedCount = await prisma.message.updateMany({
         where: { receiverId: userId, senderId: otherUserId, isRead: false },
         data: { isRead: true },
       });
+
+      // إرسال إشعار Pusher للمرسل بأن رسائله قُرئت
+      if (updatedCount.count > 0) {
+        try {
+          const { pusher: pusherServer } = await import("@/lib/pusher");
+          await pusherServer.trigger(`user-${otherUserId}`, "messages-read", {
+            readBy: userId,
+            timestamp: new Date().toISOString(),
+          });
+        } catch {}
+      }
 
       return NextResponse.json({ success: true, data: decrypted });
     }
@@ -188,7 +247,6 @@ export async function DELETE(request: NextRequest) {
     const { messageId, otherUserId, action } = body;
 
     if (messageId && !otherUserId) {
-      // حذف رسالة واحدة
       const message = await prisma.message.findUnique({
         where: { id: messageId },
       });
@@ -199,6 +257,25 @@ export async function DELETE(request: NextRequest) {
         );
       }
 
+      // حالة الحذف للجميع (فقط المرسل يمكنه ذلك)
+      if (action === "delete-for-everyone") {
+        if (message.senderId !== userId) {
+          return NextResponse.json(
+            { success: false, message: "فقط مرسل الرسالة يمكنه حذفها للجميع" },
+            { status: 403 },
+          );
+        }
+        await prisma.message.update({
+          where: { id: messageId },
+          data: { deletedAt: new Date() },
+        });
+        return NextResponse.json({
+          success: true,
+          message: "تم حذف الرسالة للجميع",
+        });
+      }
+
+      // حذف عادي (من جهة واحدة)
       if (message.senderId === userId) {
         await prisma.message.update({
           where: { id: messageId },
