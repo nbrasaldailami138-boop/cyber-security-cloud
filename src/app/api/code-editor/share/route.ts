@@ -119,6 +119,8 @@ export async function POST(request: NextRequest) {
         title: "📢 ملف مشترك جديد",
         body: `تمت مشاركة ملف "${fileName}" في محرر الأكواد`,
         data: { url: "/code-editor/shared" },
+        sound: "/sounds/alert.mp3",
+        requireInteraction: true,
       }).catch(() => {});
     }
 

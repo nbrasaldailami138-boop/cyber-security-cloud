@@ -9,9 +9,10 @@ self.addEventListener("push", (event) => {
     data: { url: data.url || "/" },
     vibrate: [200, 100, 200],
     silent: false,
-    requireInteraction: false,
+    requireInteraction: data.requireInteraction || false,
     tag: "cyber-notification",
     renotify: true,
+    sound: "/sounds/notification.mp3",
   };
 
   event.waitUntil(self.registration.showNotification(title, options));

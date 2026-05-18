@@ -210,15 +210,20 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // إرسال إشعارات خارجية (Push)
-    for (const student of students) {
-      await sendPushNotification(
-        student.id,
-        "🎉 مبارك انتقالك!",
-        `تمت ترقيتك إلى ${levelLabels[nextLevel]} في كلية الأمن السيبراني. نتمنى لك عالماً من النجاح والتفوق في عامك الدراسي الجديد. واصل الاجتهاد فأنت مستقبل هذا الوطن 🇾🇪`,
-        "/student",
-      ).catch(() => {});
-    }
+    // إرسال إشعارات خارجية (Push) مع صوت
+    try {
+      const { sendPushToUsers } = await import("@/lib/pushNotifications");
+      await sendPushToUsers(
+        students.map((s) => s.id),
+        {
+          title: "🎉 مبارك انتقالك!",
+          body: `تمت ترقيتك إلى ${levelLabels[nextLevel]} في كلية الأمن السيبراني.`,
+          data: { url: "/student" },
+          sound: "/sounds/alert.mp3",
+          requireInteraction: true,
+        },
+      );
+    } catch {}
 
     // إرسال حدث Pusher
     try {

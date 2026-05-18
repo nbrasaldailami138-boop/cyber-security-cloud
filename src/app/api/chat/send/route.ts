@@ -160,7 +160,16 @@ export async function POST(request: NextRequest) {
       `رسالة جديدة من ${sender.name}`,
       "/chat",
     );
-
+    // إرسال Push مع صوت
+    try {
+      const { sendPushToUsers } = await import("@/lib/pushNotifications");
+      await sendPushToUsers([receiverId], {
+        title: "💬 رسالة جديدة",
+        body: `رسالة جديدة من ${sender.name}`,
+        data: { url: "/chat" },
+        sound: "/sounds/notification.mp3",
+      });
+    } catch {}
     return NextResponse.json({
       success: true,
       message: "تم إرسال الرسالة",

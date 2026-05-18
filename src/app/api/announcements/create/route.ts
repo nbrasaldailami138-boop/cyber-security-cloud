@@ -91,6 +91,8 @@ export async function POST(request: NextRequest) {
             title: "📢 تعميم جديد",
             body: title.trim(),
             data: { url: "/announcements/create" },
+            sound: "/sounds/alert.mp3",
+            requireInteraction: true,
           },
         );
       } catch {

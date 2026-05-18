@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { prisma } from "@/lib/prisma";
-import { triggerNotification, triggerAssignmentUpdate } from "@/lib/pusherService";
+import {
+  triggerNotification,
+  triggerAssignmentUpdate,
+} from "@/lib/pusherService";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
 
@@ -116,7 +119,16 @@ export async function POST(request: NextRequest) {
       grade,
       status: "evaluated",
     });
-
+    // إرسال Push Notification مع صوت
+    try {
+      const { sendPushToUsers } = await import("@/lib/pushNotifications");
+      await sendPushToUsers([assignment.studentId], {
+        title: "✅ تم تقييم التكليف",
+        body: `تم تقييم تكليفك في ${assignment.subject.name} بمقدار ${grade} درجة`,
+        data: { url: "/student" },
+        sound: "/sounds/notification.mp3",
+      });
+    } catch {}
     await prisma.auditLog.create({
       data: {
         userId,

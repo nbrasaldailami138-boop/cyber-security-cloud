@@ -257,6 +257,19 @@ export async function POST(request: NextRequest) {
               `محاولة اختراق على الحساب ${user.email} من IP ${ip}`,
               "/admin/security-radar/guardian",
             ).catch(() => {});
+            // مع صوت alert
+            try {
+              await sendPushToUsers(
+                admins.map((a: any) => a.id),
+                {
+                  title: "🚨 محاولة اختراق",
+                  body: `محاولة اختراق على الحساب ${user.email}`,
+                  data: { url: "/admin/security-radar/guardian" },
+                  sound: "/sounds/alert.mp3",
+                  requireInteraction: true,
+                },
+              );
+            } catch {}
           }
         } catch (pusherError) {
           console.error("Failed to send Pusher event:", pusherError);

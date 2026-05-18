@@ -269,6 +269,8 @@ export async function POST(request: NextRequest) {
             icon: "/icons/icon-192x192.png",
             badge: "/icons/icon-96x96.png",
             data: { url: "/library" },
+            sound: "/sounds/alert.mp3",
+            requireInteraction: true,
           },
         );
       }

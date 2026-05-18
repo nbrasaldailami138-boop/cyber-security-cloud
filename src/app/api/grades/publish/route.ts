@@ -163,6 +163,7 @@ export async function POST(request: NextRequest) {
             title: "📊 توزيع درجات",
             body: `قام معلم ${subjectName} برفع درجاتك في ${msgType}`,
             data: { url: "/student" },
+            sound: "/sounds/notification.mp3",
           },
         );
       } catch {}

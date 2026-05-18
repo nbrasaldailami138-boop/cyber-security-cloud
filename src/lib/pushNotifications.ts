@@ -47,6 +47,8 @@ export async function sendPushToUsers(
     icon?: string;
     badge?: string;
     data?: any;
+    requireInteraction?: boolean;
+    sound?: string;
   },
 ) {
   if (!userIds || userIds.length === 0) return;
@@ -64,6 +66,8 @@ export async function sendPushToUsers(
       icon: notification.icon || "/icons/icon-192x192.png",
       badge: notification.badge || "/icons/icon-96x96.png",
       data: notification.data || {},
+      requireInteraction: notification.requireInteraction || false,
+      sound: notification.sound || "/sounds/notification.mp3",
     });
 
     const results = await Promise.allSettled(

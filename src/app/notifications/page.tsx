@@ -68,6 +68,12 @@ export default function NotificationsPage() {
       const channel = pusher.subscribe(`user-${user.id}`);
       channel.bind("notification", (data: any) => {
         addNotification(data);
+        // تشغيل صوت الإشعار
+        try {
+          const audio = new Audio("/sounds/notification.mp3");
+          audio.volume = 0.5;
+          audio.play().catch(() => {});
+        } catch {}
       });
 
       unsubscribe = () => {
