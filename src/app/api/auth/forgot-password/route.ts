@@ -51,12 +51,11 @@ export async function POST(request: NextRequest) {
       where: { email, deletedAt: null },
     });
 
-    // لا نكشف إذا كان المستخدم موجوداً أم لا (أمان)
     if (!user || !user.isActivated) {
-      return NextResponse.json({
-        success: true,
-        message: "إذا كان البريد مسجلاً، سيصلك كود التحقق قريباً.",
-      });
+      return NextResponse.json(
+        { success: false, message: "البريد الإلكتروني غير مسجل في النظام" },
+        { status: 404 },
+      );
     }
 
     // توليد كود التحقق

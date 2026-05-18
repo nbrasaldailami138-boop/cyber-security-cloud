@@ -72,6 +72,7 @@ export default function LoginPage() {
   const [activateEmail, setActivateEmail] = useState("");
   const [activatePassword, setActivatePassword] = useState("");
   const [activateConfirm, setActivateConfirm] = useState("");
+  const [showActivateHelp, setShowActivateHelp] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const captchaRef = useRef<HTMLDivElement>(null);
@@ -306,7 +307,7 @@ export default function LoginPage() {
         if (data.success) {
           setForgotStep("code");
         } else {
-          setError(data.message || "فشل الإرسال");
+          showToast(data.message || "فشل الإرسال", "error");
         }
       } catch {
         setError("حدث خطأ في الاتصال");
@@ -966,6 +967,59 @@ export default function LoginPage() {
                 >
                   تفعيل الحساب
                 </h2>
+                {/* أيقونة المساعدة */}
+                <div style={{ textAlign: "left", marginBottom: "8px" }}>
+                  <span
+                    onClick={() => setShowActivateHelp(!showActivateHelp)}
+                    style={{
+                      cursor: "pointer",
+                      fontSize: "1.2rem",
+                      color: "#ffca28",
+                    }}
+                    title="كيفية التفعيل"
+                  >
+                    خطوات تفعيل الحساب
+                  </span>
+                </div>
+
+                {/* تعليمات التفعيل */}
+                {showActivateHelp && (
+                  <div
+                    style={{
+                      background: "rgba(255,202,40,0.08)",
+                      border: "1px solid rgba(255,202,40,0.25)",
+                      borderRadius: "12px",
+                      padding: "12px 14px",
+                      marginBottom: "15px",
+                      fontSize: "0.8rem",
+                      color: "#e6edf3",
+                      textAlign: "right",
+                      lineHeight: 1.8,
+                    }}
+                  >
+                    <p
+                      style={{
+                        margin: "0 0 8px",
+                        fontWeight: 700,
+                        color: "#ffca28",
+                      }}
+                    >
+                      📋 خطوات تفعيل الحساب:
+                    </p>
+                    <p style={{ margin: "0 0 4px" }}>
+                      1️⃣ أدخل <strong>كود تفعيل الحساب</strong> المرسل إليك.
+                    </p>
+                    <p style={{ margin: "0 0 4px" }}>
+                      2️⃣ أدخل <strong>الإيميل الخاص بك</strong> حتى نتمكن من
+                      إرسال كود استعادة كلمة المرور في حال نسيتها. يمكنك إنشاء
+                      إيميل جديد وإدخاله للحفاظ على خصوصيتك.
+                    </p>
+                    <p style={{ margin: 0 }}>
+                      3️⃣ أدخل <strong>كلمة مرور قوية</strong> تتكون من أحرف
+                      كبيرة وصغيرة وأرقام.
+                    </p>
+                  </div>
+                )}
 
                 {error && (
                   <div
@@ -994,10 +1048,12 @@ export default function LoginPage() {
                   />
                   <input
                     type="email"
-                    placeholder="البريد الإلكتروني الشخصي"
+                    placeholder="البريد الإلكتروني الحقيقي (example@gmail.com)"
                     style={inputStyle}
                     value={activateEmail}
                     onChange={(e) => setActivateEmail(e.target.value)}
+                    pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}"
+                    title="يرجى إدخال بريد إلكتروني حقيقي مثل example@gmail.com"
                     required
                   />
                   <input
