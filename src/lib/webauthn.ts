@@ -14,7 +14,12 @@ import { prisma } from "@/lib/prisma";
 // إعدادات الموقع - يجب أن تطابق الدومين الحقيقي عند النشر
 const rpName = "سحابة الأمن السيبراني";
 const rpID =
-  process.env.NODE_ENV === "production" ? "your-domain.com" : "localhost";
+  process.env.NODE_ENV === "production"
+    ? new URL(
+        process.env.NEXT_PUBLIC_APP_URL ||
+          "https://cyber-security-cloud.vercel.app",
+      ).hostname
+    : "localhost";
 const origin = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 // الخطوة 1: إنشاء خيارات تسجيل بصمة جديدة
