@@ -11,6 +11,7 @@ import {
   startRegistration,
 } from "@simplewebauthn/browser";
 import { useAuthStore } from "@/store/authStore";
+import { useToast } from "@/components/ui/Toast";
 import { getSiteKey } from "@/lib/captcha";
 import { registerPushNotifications } from "@/lib/pushClient";
 import HCaptcha from "@hcaptcha/react-hcaptcha";
@@ -32,6 +33,7 @@ export default function LoginPage() {
   const router = useRouter();
 
   const setUser = useAuthStore((s) => s.setUser);
+  const { showToast } = useToast();
 
   // حالة لوحة العرض
   const [panel, setPanel] = useState<Panel>("login");
@@ -347,18 +349,18 @@ export default function LoginPage() {
           }),
         });
         const data = await res.json();
-        if (data.success) {
+        if (data.status === "success") {
           switchPanel("login");
           setForgotStep("email");
-          // ملء حقل البريد وكلمة المرور تلقائياً
-          setUsername(forgotEmail);
-          setPassword(forgotNewPass);
           setForgotEmail("");
           setForgotCode("");
           setForgotNewPass("");
           setForgotConfirmPass("");
           setTimeout(() => {
-            alert("✅ تم تغيير كلمة المرور بنجاح. يمكنك الآن تسجيل الدخول.");
+            showToast(
+              "✅ تم تغيير كلمة المرور بنجاح. يمكنك الآن تسجيل الدخول.",
+              "success",
+            );
           }, 300);
         } else {
           setError(data.message || "فشل التغيير");
@@ -389,14 +391,26 @@ export default function LoginPage() {
         }),
       });
       const data = await res.json();
-      if (data.status === "success") {
-        switchPanel("login");
+      if (data.success) {
+        // تخزين البيانات قبل المسح
+        const savedEmail = activateEmail;
+        const savedPassword = activatePassword;
+        // مسح حقول التفعيل
         setActivateCode("");
         setActivateEmail("");
         setActivatePassword("");
         setActivateConfirm("");
+        // ملء حقول تسجيل الدخول
+        setUsername(savedEmail);
+        setPassword(savedPassword);
+        // التبديل إلى لوحة تسجيل الدخول
+        setPanel("login");
+        setGlobeRight(false);
         setTimeout(() => {
-          alert("✅ تم تفعيل الحساب بنجاح. يمكنك الآن تسجيل الدخول.");
+          showToast(
+            "✅ تم تفعيل الحساب بنجاح. يمكنك الآن تسجيل الدخول.",
+            "success",
+          );
         }, 300);
       } else {
         setError(data.message || "فشل التفعيل");
