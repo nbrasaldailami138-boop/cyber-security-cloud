@@ -35,13 +35,15 @@ export async function POST(request: NextRequest) {
 
     const { email, captchaToken } = validation.data;
 
-    // التحقق من CAPTCHA
-    const captchaOk = await verifyCaptcha(captchaToken || null);
-    if (!captchaOk) {
-      return NextResponse.json(
-        { success: false, message: "التحقق البشري فشل. حاول مرة أخرى." },
-        { status: 400 },
-      );
+    // التحقق من CAPTCHA (فقط إذا تم إرسال التوكن)
+    if (captchaToken) {
+      const captchaOk = await verifyCaptcha(captchaToken);
+      if (!captchaOk) {
+        return NextResponse.json(
+          { success: false, message: "التحقق البشري فشل. حاول مرة أخرى." },
+          { status: 400 },
+        );
+      }
     }
 
     // البحث عن المستخدم
@@ -52,7 +54,7 @@ export async function POST(request: NextRequest) {
     // لا نكشف إذا كان المستخدم موجوداً أم لا (أمان)
     if (!user || !user.isActivated) {
       return NextResponse.json({
-        status: "success",
+        success: true,
         message: "إذا كان البريد مسجلاً، سيصلك كود التحقق قريباً.",
       });
     }
@@ -86,7 +88,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      status: "success",
+      success: true,
       message: "تم إرسال كود التحقق إلى بريدك الإلكتروني.",
     });
   } catch (error: any) {

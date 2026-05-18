@@ -50,12 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     // تشفير كلمة المرور الجديدة
-    const passwordHash = await argon2.hash(newPassword, {
-      type: argon2.argon2id,
-      memoryCost: 65536,
-      timeCost: 3,
-      parallelism: 4,
-    });
+    const passwordHash = await bcrypt.hash(newPassword, 12);
 
     // تحديث كلمة المرور
     await prisma.user.update({
@@ -86,7 +81,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({
-      status: "success",
+      success: true,
       message: "تم تغيير كلمة المرور بنجاح. يمكنك الآن تسجيل الدخول.",
     });
   } catch (error: any) {

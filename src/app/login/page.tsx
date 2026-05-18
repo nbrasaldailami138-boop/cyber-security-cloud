@@ -301,7 +301,7 @@ export default function LoginPage() {
           body: JSON.stringify({ email: forgotEmail, captchaToken }),
         });
         const data = await res.json();
-        if (data.status === "success") {
+        if (data.success) {
           setForgotStep("code");
         } else {
           setError(data.message || "فشل الإرسال");
@@ -347,14 +347,19 @@ export default function LoginPage() {
           }),
         });
         const data = await res.json();
-        if (data.status === "success") {
+        if (data.success) {
           switchPanel("login");
           setForgotStep("email");
+          // ملء حقل البريد وكلمة المرور تلقائياً
+          setUsername(forgotEmail);
+          setPassword(forgotNewPass);
           setForgotEmail("");
           setForgotCode("");
           setForgotNewPass("");
           setForgotConfirmPass("");
-          alert("تم تغيير كلمة المرور بنجاح");
+          setTimeout(() => {
+            alert("✅ تم تغيير كلمة المرور بنجاح. يمكنك الآن تسجيل الدخول.");
+          }, 300);
         } else {
           setError(data.message || "فشل التغيير");
         }
@@ -385,8 +390,14 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (data.status === "success") {
-        alert(data.message);
         switchPanel("login");
+        setActivateCode("");
+        setActivateEmail("");
+        setActivatePassword("");
+        setActivateConfirm("");
+        setTimeout(() => {
+          alert("✅ تم تفعيل الحساب بنجاح. يمكنك الآن تسجيل الدخول.");
+        }, 300);
       } else {
         setError(data.message || "فشل التفعيل");
       }
@@ -1128,6 +1139,44 @@ export default function LoginPage() {
                       }}
                     >
                       {loading ? "⏳ جاري التحقق..." : "تحقق من الكود"}
+                    </button>
+                    <button
+                      onClick={async () => {
+                        setLoading(true);
+                        setError("");
+                        try {
+                          const res = await fetch("/api/auth/forgot-password", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              email: forgotEmail,
+                              captchaToken,
+                            }),
+                          });
+                          const data = await res.json();
+                          if (data.status === "success" || data.success) {
+                            alert("📧 تم إعادة إرسال كود التحقق إلى بريدك");
+                          } else {
+                            setError(data.message || "فشل الإرسال");
+                          }
+                        } catch {
+                          setError("حدث خطأ في الاتصال");
+                        } finally {
+                          setLoading(false);
+                        }
+                      }}
+                      disabled={loading}
+                      style={{
+                        ...btnStyle,
+                        background: "transparent",
+                        border: "1px solid rgba(255,202,40,0.3)",
+                        boxShadow: "none",
+                        color: "#ffca28",
+                        opacity: loading ? 0.6 : 1,
+                        marginTop: "8px",
+                      }}
+                    >
+                      {loading ? "⏳ جاري..." : "🔄 إعادة إرسال الكود"}
                     </button>
                   </>
                 )}

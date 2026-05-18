@@ -32,13 +32,15 @@ export async function POST(request: NextRequest) {
     const { code, email, password, captchaToken } = validation.data;
     const ip = request.headers.get("x-forwarded-for") || "unknown";
 
-    // التحقق من CAPTCHA
-    const captchaOk = await verifyCaptcha(captchaToken || null);
-    if (!captchaOk) {
-      return NextResponse.json(
-        { success: false, message: "التحقق البشري فشل. حاول مرة أخرى." },
-        { status: 400 },
-      );
+    // التحقق من CAPTCHA (فقط إذا تم إرسال التوكن)
+    if (captchaToken) {
+      const captchaOk = await verifyCaptcha(captchaToken);
+      if (!captchaOk) {
+        return NextResponse.json(
+          { success: false, message: "التحقق البشري فشل. حاول مرة أخرى." },
+          { status: 400 },
+        );
+      }
     }
 
     const codeHash = hashToken(code);
@@ -105,12 +107,7 @@ export async function POST(request: NextRequest) {
     }
 
     // تشفير كلمة المرور
-    const passwordHash = await argon2.hash(password, {
-      type: argon2.argon2id,
-      memoryCost: 65536,
-      timeCost: 3,
-      parallelism: 4,
-    });
+    const passwordHash = await bcrypt.hash(password, 12);
 
     // تحديث المستخدم: حفظ البريد الإلكتروني الشخصي + كلمة المرور + تفعيل الحساب
     await prisma.user.update({
@@ -147,7 +144,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({
-      status: "success",
+      success: true,
       message: "تم تفعيل الحساب بنجاح. يمكنك الآن تسجيل الدخول.",
       data: {
         role: user.role,
