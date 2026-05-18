@@ -169,6 +169,61 @@ export default function LoginPage() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // ==================== فتح البصمة تلقائياً للمستخدمين المفعلين ====================
+  useEffect(() => {
+    const autoTriggerWebAuthn = async () => {
+      // نتحقق إذا كان المتصفح يدعم WebAuthn
+      if (!window.PublicKeyCredential) return;
+
+      try {
+        const startRes = await fetch("/api/auth/webauthn/login/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: "" }), // بدون إيميل - discovery
+        });
+        const startData = await startRes.json();
+        if (!startData.success) return; // لا توجد بصمات مفعلة
+
+        // يوجد بصمة مفعلة - نفتح نافذة البصمة تلقائياً
+        setLoading(true);
+        setError("");
+
+        const authResponse = await startAuthentication({
+          optionsJSON: startData.options,
+        });
+
+        const completeRes = await fetch("/api/auth/webauthn/login/complete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: startData.userId,
+            authResponse,
+          }),
+        });
+
+        const completeData = await completeRes.json();
+        if (!completeData.success) throw new Error(completeData.message);
+
+        setUser({
+          id: startData.userId || "",
+          email: completeData.email || "",
+          name: completeData.name || "",
+          role: completeData.role,
+          level: completeData.level || "",
+          webAuthnEnabled: true,
+        });
+
+        redirectToDashboard(completeData.role);
+      } catch {
+        // المستخدم لم يفعل البصمة أو فشلت - لا نفعل شيئاً
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    autoTriggerWebAuthn();
+  }, []); // تشتغل مرة واحدة عند فتح الصفحة
+
   // ==================== التوجيه حسب الدور ====================
   const redirectToDashboard = (role: string) => {
     if (role === "ADMIN") router.push("/admin");
@@ -753,10 +808,6 @@ export default function LoginPage() {
                     <button
                       type="button"
                       onClick={async () => {
-                        if (!username) {
-                          setError("يرجى إدخال البريد الإلكتروني أولاً");
-                          return;
-                        }
                         setLoading(true);
                         setError("");
                         try {
@@ -765,7 +816,9 @@ export default function LoginPage() {
                             {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ email: username }),
+                              body: JSON.stringify({
+                                email: username || undefined,
+                              }),
                             },
                           );
                           const startData = await startRes.json();

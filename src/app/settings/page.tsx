@@ -6,6 +6,8 @@ import Sidebar from "@/components/layout/Sidebar";
 import PageTransition from "@/components/layout/PageTransition";
 
 import TwoFATab from "@/components/settings/TwoFATab";
+import { useToast } from "@/components/ui/Toast";
+import WebAuthnTab from "@/components/settings/WebAuthnTab";
 import { csrfFetch } from "@/lib/csrfClient";
 
 interface ProfileData {
@@ -17,6 +19,7 @@ interface ProfileData {
   status: string;
   isActivated: boolean;
   twoFactorEnabled: boolean;
+  webAuthnEnabled: boolean;
   createdAt: string;
   lastLoginAt: string | null;
   stats: { assignmentsCount: number };
@@ -27,10 +30,12 @@ const tabs = [
   "تغيير كلمة المرور",
   "تعديل البيانات",
   "المصادقة الثنائية",
+  "الدخول بالبصمة",
 ];
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState(0);
+  const { showToast } = useToast();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -89,6 +94,7 @@ export default function SettingsPage() {
       if (data.success) {
         setPasswordMsg("تم تغيير كلمة المرور بنجاح");
         setPasswordMsgType("success");
+        showToast("✅ تم تغيير كلمة المرور بنجاح", "success");
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
@@ -117,6 +123,7 @@ export default function SettingsPage() {
       const data = await res.json();
       if (data.success) {
         setNameMsg("تم إرسال طلب تغيير الاسم");
+        showToast("✅ تم إرسال طلب تغيير الاسم", "success");
         setNewName("");
       } else {
         setNameMsg(data.message);
@@ -141,6 +148,7 @@ export default function SettingsPage() {
       const data = await res.json();
       if (data.success) {
         setEmailMsg("تم إرسال طلب تغيير البريد الإلكتروني");
+        showToast("✅ تم إرسال طلب تغيير البريد", "success");
         setNewEmail("");
       } else {
         setEmailMsg(data.message);
@@ -685,6 +693,18 @@ export default function SettingsPage() {
             >
               <TwoFATab
                 twoFactorEnabled={profile?.twoFactorEnabled || false}
+                onUpdate={() => fetchProfile()}
+              />
+            </motion.div>
+          )}
+          {activeTab === 4 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <WebAuthnTab
+                webAuthnEnabled={profile?.webAuthnEnabled || false}
                 onUpdate={() => fetchProfile()}
               />
             </motion.div>

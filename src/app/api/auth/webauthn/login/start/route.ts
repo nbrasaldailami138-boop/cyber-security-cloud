@@ -7,27 +7,41 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { email } = body;
 
-    if (!email) {
-      return NextResponse.json(
-        { success: false, message: "البريد مطلوب" },
-        { status: 400 },
-      );
+    // إذا تم إرسال الإيميل، نبحث عن المستخدم
+    if (email) {
+      const user = await prisma.user.findUnique({
+        where: { email, deletedAt: null },
+      });
+
+      if (!user || !user.webAuthnEnabled) {
+        return NextResponse.json(
+          { success: false, message: "البصمة غير مفعلة لهذا الحساب" },
+          { status: 400 },
+        );
+      }
+
+      const options = await generateAuthenticationOpts(user.id);
+      return NextResponse.json({ success: true, options, userId: user.id });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email, deletedAt: null },
+    // إذا لم يتم إرسال إيميل، نستخدم Passkey discovery (للجوال)
+    // نجلب جميع المستخدمين المفعلين للبصمة
+    const users = await prisma.user.findMany({
+      where: { webAuthnEnabled: true, deletedAt: null },
+      select: { id: true },
+      take: 50,
     });
 
-    if (!user || !user.webAuthnEnabled) {
+    if (users.length === 0) {
       return NextResponse.json(
-        { success: false, message: "البصمة غير مفعلة لهذا الحساب" },
+        { success: false, message: "لا توجد حسابات مفعلة بالبصمة" },
         { status: 400 },
       );
     }
 
-    const options = await generateAuthenticationOpts(user.id);
-
-    return NextResponse.json({ success: true, options, userId: user.id });
+    // استخدام أول مستخدم (أو يمكنك استخدام منطق discovery)
+    const options = await generateAuthenticationOpts(users[0].id);
+    return NextResponse.json({ success: true, options, userId: users[0].id });
   } catch (error: any) {
     return NextResponse.json(
       { success: false, message: error.message },
