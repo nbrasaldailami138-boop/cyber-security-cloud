@@ -181,44 +181,56 @@ export default function ChatArea({
   }, []);
   // قناة موحدة لجميع الأحداث
   const { sendBroadcast } = useSupabaseRealtime(`user-${userId}`, [
-    { event: "messages-read", handler: (payload: any) => {
-      const data = payload;
-      if (data && data.isRead && onMessagesRead) {
-        onMessagesRead();
-      }
-    }},
-    { event: "typing", handler: (payload: any) => {
-      const data = payload;
-      if (data && selectedUser && data.userId === selectedUser.id) {
-        setTypingUser(data.userId);
-        if (typingTimeoutRef.current) {
-          clearTimeout(typingTimeoutRef.current);
+    {
+      event: "messages-read",
+      handler: (payload: any) => {
+        const data = payload;
+        if (data && data.isRead && onMessagesRead) {
+          onMessagesRead();
         }
-        typingTimeoutRef.current = setTimeout(() => setTypingUser(null), 2000);
-      }
-    }},
-    { event: "new-message", handler: (payload: any) => {
-      const data = payload;
-      if (data && selectedUser && data.senderId === selectedUser.id) {
-        try {
-          const audio = new Audio("/sounds/notification.mp3");
-          audio.volume = 0.5;
-          audio.play().catch(() => {});
-        } catch {}
-        if (onNewMessage) {
-          onNewMessage({
-            id: data.id || Date.now().toString(),
-            senderId: data.senderId,
-            receiverId: userId,
-            body: data.body,
-            isRead: true,
-            isEdited: false,
-            createdAt: data.createdAt || new Date().toISOString(),
-            sender: { id: data.senderId, name: data.sender?.name || "" },
-          });
+      },
+    },
+    {
+      event: "typing",
+      handler: (payload: any) => {
+        const data = payload;
+        if (data && selectedUser && data.userId === selectedUser.id) {
+          setTypingUser(data.userId);
+          if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+          }
+          typingTimeoutRef.current = setTimeout(
+            () => setTypingUser(null),
+            2000,
+          );
         }
-      }
-    }},
+      },
+    },
+    {
+      event: "new-message",
+      handler: (payload: any) => {
+        const data = payload;
+        if (data && selectedUser && data.senderId === selectedUser.id) {
+          try {
+            const audio = new Audio("/sounds/notification.mp3");
+            audio.volume = 0.5;
+            audio.play().catch(() => {});
+          } catch {}
+          if (onNewMessage) {
+            onNewMessage({
+              id: data.id || Date.now().toString(),
+              senderId: data.senderId,
+              receiverId: userId,
+              body: data.body,
+              isRead: true,
+              isEdited: false,
+              createdAt: data.createdAt || new Date().toISOString(),
+              sender: { id: data.senderId, name: data.sender?.name || "" },
+            });
+          }
+        }
+      },
+    },
   ]);
 
   // ==================== إرسال ====================
@@ -237,13 +249,26 @@ export default function ChatArea({
       isEdited: false,
       createdAt: new Date().toISOString(),
       sender: { id: userId, name: "أنت" },
+      ...(replyTo
+        ? ({
+            replyTo: {
+              id: replyTo.id,
+              body: replyTo.body,
+              sender: replyTo.sender,
+            },
+          } as any)
+        : {}),
     };
 
+    // إضافة الرسالة للواجهة مباشرة (optimistic)
     if (onNewMessage) {
       onNewMessage(optimisticMsg);
     }
+    // منع التكرار: نخزن الـ tempId عشان realtime ما يضيفه مرة ثانية
+    const tempIdRef = tempId;
 
     setNewMessage("");
+    setReplyTo(null); // إخفاء شريط الرد بعد الإرسال
     setSendingMsgId(tempId);
     setLoading(true);
 
@@ -905,10 +930,25 @@ export default function ChatArea({
           type="text"
           placeholder="اكتب رسالتك..."
           value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && sendMessage()}
           onFocus={() => {
             if (selectedUser && userId) {
+              try {
+                import("@/lib/supabaseRealtime")
+                  .then(({ broadcastEvent }) => {
+                    broadcastEvent(`user-${selectedUser.id}`, "typing", {
+                      userId,
+                      name: "",
+                    });
+                  })
+                  .catch(() => {});
+              } catch {}
+            }
+          }}
+          onChange={(e) => {
+            setNewMessage(e.target.value);
+            // إرسال typing event أثناء الكتابة
+            if (selectedUser && userId && e.target.value.length > 0) {
               try {
                 import("@/lib/supabaseRealtime")
                   .then(({ broadcastEvent }) => {
