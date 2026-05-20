@@ -152,7 +152,7 @@ export async function GET(request: NextRequest) {
       // العزل الأكاديمي: التحقق من أن المستخدم الآخر في نفس المستوى
       const otherUser = await prisma.user.findUnique({
         where: { id: otherUserId, deletedAt: null },
-        select: { id: true, level: true },
+        select: { id: true, level: true, role: true },
       });
       if (!otherUser) {
         return NextResponse.json(
@@ -160,7 +160,7 @@ export async function GET(request: NextRequest) {
           { status: 404 },
         );
       }
-      if (!isSameLevel(otherUser.level, "STUDENT")) {
+      if (!isSameLevel(otherUser.level, otherUser.role)) {
         return NextResponse.json(
           { success: false, message: "غير مصرح بالوصول لمحادثات هذا المستخدم" },
           { status: 403 },
