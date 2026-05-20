@@ -19,7 +19,11 @@ const channels: Record<string, { channel: any; ready: boolean; queue: any[] }> =
 
 function getOrCreateChannel(channelName: string) {
   if (!channels[channelName]) {
-    const entry: { channel: any; ready: boolean; queue: any[] } = { channel: null, ready: false, queue: [] };
+    const entry: { channel: any; ready: boolean; queue: any[] } = {
+      channel: null,
+      ready: false,
+      queue: [],
+    };
 
     const channel = supabase.channel(channelName, {
       config: { broadcast: { self: true } },
@@ -75,22 +79,47 @@ export function broadcastEvent(
   }
 }
 
-// ==================== نظام Presence ====================
+// ==================== نظام Presence (قناة واحدة مشتركة) ====================
+
+let presenceChannel: any = null;
+let presenceCallbacks: Array<(users: string[]) => void> = [];
+let presenceUserId: string = "";
 
 export function trackPresence(userId: string): void {
   try {
-    const channel = supabase.channel(`presence-online`, {
+    if (presenceChannel) {
+      // القناة موجودة - تتبع المستخدم الجديد
+      presenceUserId = userId;
+      presenceChannel
+        .track({
+          userId,
+          online_at: new Date().toISOString(),
+        })
+        .catch(() => {});
+      return;
+    }
+
+    presenceUserId = userId;
+    presenceChannel = supabase.channel(`presence-online`, {
       config: { presence: { key: userId } },
     });
 
-    channel.subscribe(async (status: string) => {
-      if (status === "SUBSCRIBED") {
-        await channel.track({
-          userId,
-          online_at: new Date().toISOString(),
-        });
-      }
-    });
+    presenceChannel
+      .on("presence", { event: "sync" }, () => {
+        const state = presenceChannel.presenceState();
+        const onlineUsers = Object.keys(state);
+        for (const cb of presenceCallbacks) {
+          cb(onlineUsers);
+        }
+      })
+      .subscribe(async (status: string) => {
+        if (status === "SUBSCRIBED") {
+          await presenceChannel.track({
+            userId,
+            online_at: new Date().toISOString(),
+          });
+        }
+      });
   } catch {
     // Silent fail
   }
@@ -99,33 +128,17 @@ export function trackPresence(userId: string): void {
 export function getOnlineUsers(
   callback: (users: string[]) => void,
 ): () => void {
-  try {
-    const channel = supabase.channel(`presence-online`, {
-      config: { presence: { key: "listener" } },
-    });
+  presenceCallbacks.push(callback);
 
-    channel
-      .on("presence", { event: "sync" }, () => {
-        const state = channel.presenceState();
-        const onlineUsers = Object.keys(state);
-        callback(onlineUsers);
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel).catch(() => {});
-    };
-  } catch {
-    return () => {};
-  }
+  return () => {
+    presenceCallbacks = presenceCallbacks.filter((cb) => cb !== callback);
+  };
 }
 
 export function isUserOnline(userId: string): boolean {
   try {
-    const channel = supabase.channel(`presence-online`, {
-      config: { presence: { key: "check" } },
-    });
-    const state = channel.presenceState();
+    if (!presenceChannel) return false;
+    const state = presenceChannel.presenceState();
     return Object.keys(state).includes(userId);
   } catch {
     return false;
