@@ -12,6 +12,7 @@ import Pagination from "@/components/ui/Pagination";
 import { usePagination } from "@/hooks/usePagination";
 import { useAuthStore } from "@/store/authStore";
 import { csrfFetch } from "@/lib/csrfClient";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 
 // ==================== الأنواع ====================
 interface Subject {
@@ -162,6 +163,14 @@ export default function TeacherDashboard() {
   const userRole = user?.role || "";
   const userLevel = user?.level || "";
 
+  useSupabaseRealtime(`user-${userId}`, "assignment-update", () => {
+    loadPending();
+    loadHistory();
+  });
+  useSupabaseRealtime(`user-${userId}`, "notification", () => {
+    loadStudentsCount();
+  });
+
   // التبويبات
   type Tab = "inbox" | "history" | "grades";
   const [activeTab, setActiveTab] = useState<Tab>("inbox");
@@ -263,48 +272,6 @@ export default function TeacherDashboard() {
   useEffect(() => {
     if (activeTab === "history") loadHistory();
   }, [activeTab, historyPag.page]);
-
-  // ==================== Pusher للحظية ====================
-  useEffect(() => {
-    let channel: any = null;
-    const setup = async () => {
-      try {
-        const PusherClient = (await import("pusher-js")).default;
-        const pusher = new PusherClient(
-          process.env.NEXT_PUBLIC_PUSHER_KEY || "45585387a0d70f319a67",
-          {
-            cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || "eu",
-          },
-        );
-        channel = pusher.subscribe(`user-${userId}`);
-        channel.bind("assignment-update", () => {
-          loadPending();
-          loadHistory();
-          showToast("📥 وصول تكليف جديد", "info");
-        });
-        channel.bind("notification", (data: any) => {
-          if (
-            data.type === "ASSIGNMENT_EVALUATED" ||
-            data.type === "NEW_ASSIGNMENT"
-          ) {
-            loadPending();
-            loadHistory();
-            loadStudentsCount();
-            showToast(data.body || "تحديث جديد", "info");
-          }
-        });
-      } catch {
-        /* صامت */
-      }
-    };
-    if (userId) setup();
-    return () => {
-      if (channel) {
-        channel.unbind_all();
-        channel.unsubscribe();
-      }
-    };
-  }, [userId, loadPending, loadHistory, loadStudentsCount, showToast]);
 
   // ==================== تقييم تكليف ====================
   const handleEvaluate = async () => {

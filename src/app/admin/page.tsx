@@ -9,6 +9,7 @@ import Sidebar from "@/components/layout/Sidebar";
 import { useToast } from "@/components/ui/Toast";
 import PageTransition from "@/components/layout/PageTransition";
 import { useAuthStore } from "@/store/authStore";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 
 // ==================== الأنواع ====================
 interface ServerStats {
@@ -47,6 +48,10 @@ export default function AdminDashboard() {
 
   const userName = user?.name || "";
   const userId = user?.id || "";
+
+  useSupabaseRealtime(`user-${userId}`, "notification", () => {
+    loadStats();
+  });
 
   const [stats, setStats] = useState<ServerStats>({
     totalUsers: 0,
@@ -93,36 +98,6 @@ export default function AdminDashboard() {
   useEffect(() => {
     loadStats();
   }, [loadStats]);
-
-  // ==================== Pusher ====================
-  useEffect(() => {
-    if (!userId) return;
-    let channel: any = null;
-    const setup = async () => {
-      try {
-        const PusherClient = (await import("pusher-js")).default;
-        const pusher = new PusherClient(
-          process.env.NEXT_PUBLIC_PUSHER_KEY || "45585387a0d70f319a67",
-          {
-            cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || "eu",
-          },
-        );
-        channel = pusher.subscribe(`user-${userId}`);
-        channel.bind("notification", () => {
-          loadStats();
-        });
-      } catch {
-        /* صامت */
-      }
-    };
-    setup();
-    return () => {
-      if (channel) {
-        channel.unbind_all();
-        channel.unsubscribe();
-      }
-    };
-  }, [userId, loadStats]);
 
   // ==================== تسجيل الخروج ====================
   const handleLogout = async () => {

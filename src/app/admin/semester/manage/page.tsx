@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
 import PageTransition from "@/components/layout/PageTransition";
 import { useAuth } from "@/hooks/useAuth";
-import { usePusher } from "@/hooks/usePusher";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 
 interface SubjectItem {
   id: string;
@@ -77,7 +77,7 @@ export default function SemesterManagePage() {
     loadData();
   }, [loadData]);
 
-  usePusher("semester", "subjects-update", () => {
+  useSupabaseRealtime("semester", "subjects-update", () => {
     loadData();
   });
 

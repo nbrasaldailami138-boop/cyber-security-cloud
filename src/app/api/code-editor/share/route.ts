@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyAccessToken } from "@/lib/auth";
-import { pusher } from "@/lib/pusher";
+import { broadcastEvent } from "@/lib/supabaseRealtime";
 import { sendPushToUsers } from "@/lib/pushNotifications";
 
 export async function POST(request: NextRequest) {
@@ -78,12 +78,19 @@ export async function POST(request: NextRequest) {
       create: { key: "code_editor_shares", value: JSON.stringify(shares) },
     });
 
-    // إرسال إشعار عبر Pusher
-    await pusher.trigger("code-editor", "file-shared", {
-      fileName,
-      level: level || payload.level,
-      authorName: showAuthor !== false ? payload.email : "مجهول",
-    });
+    // إرسال إشعار عبر Supabase
+    const supabase = getSupabase();
+    await supabase
+      .from("system_configs")
+      .upsert({
+        key: `ev_code-editor_file-shared_${Date.now()}`,
+        value: JSON.stringify({
+          fileName,
+          level: level || payload.level,
+          authorName: showAuthor !== false ? payload.email : "مجهول",
+        }),
+      })
+      .catch(() => {});
 
     // إرسال إشعارات داخلية للمستخدمين في نفس المستوى
     const usersInLevel = await prisma.user.findMany({

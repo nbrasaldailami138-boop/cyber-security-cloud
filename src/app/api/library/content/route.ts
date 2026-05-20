@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { prisma } from "@/lib/prisma";
-import { triggerChannelEvent } from "@/lib/pusherService";
+import { broadcastEvent } from "@/lib/supabaseRealtime";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
 
@@ -213,9 +213,9 @@ export async function DELETE(request: NextRequest) {
       data: { deletedAt: new Date() },
     });
 
-    // إشعار Pusher
+    // إشعار Supabase Broadcast
     try {
-      await triggerChannelEvent(
+      broadcastEvent(
         `library-level-${userLevel}`,
         "content-deleted",
         {

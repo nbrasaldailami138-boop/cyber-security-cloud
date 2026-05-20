@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Sidebar from "@/components/layout/Sidebar";
 import PageTransition from "@/components/layout/PageTransition";
 import { useAuth } from "@/hooks/useAuth";
-import { usePusher } from "@/hooks/usePusher";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 
 interface StudentItem {
   id: string;
@@ -81,7 +81,7 @@ export default function PromotePage() {
     loadData();
   }, [loadData]);
 
-  usePusher("semester", "promotion-update", () => {
+  useSupabaseRealtime("semester", "promotion-update", () => {
     loadData();
   });
 

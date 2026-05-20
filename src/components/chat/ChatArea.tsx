@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/components/ui/Toast";
 import { csrfFetch } from "@/lib/csrfClient";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 
 // ==================== الأنواع ====================
 interface ChatUser {
@@ -131,6 +132,7 @@ export default function ChatArea({
     messageId?: string;
   }>({ show: false, title: "", message: "", action: "" });
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // تفعيل الصوت (يحتاج تفاعل مستخدم مرة واحدة)
   useEffect(() => {
@@ -157,121 +159,86 @@ export default function ChatArea({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-  // تحديث ✓✓ لحظي عند قراءة الرسائل
+  // تنظيف typingTimeout عند unmount
   useEffect(() => {
-    if (!userId || !selectedUser) return;
-    let channel: any = null;
-    const setup = async () => {
-      try {
-        const PusherClient = (await import("pusher-js")).default;
-        const pusher = new PusherClient(
-          process.env.NEXT_PUBLIC_PUSHER_KEY || "45585387a0d70f319a67",
-          { cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || "eu" },
-        );
-        channel = pusher.subscribe(`user-${userId}`);
-        channel.bind("messages-read", () => {
-          if (onMessagesRead) onMessagesRead();
-        });
-      } catch {}
-    };
-    setup();
     return () => {
-      if (channel) {
-        channel.unbind_all();
-        channel.unsubscribe();
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
       }
     };
-  }, [userId, selectedUser, onMessagesRead]);
+  }, []);
+  // تحديث ✓✓ لحظي عند قراءة الرسائل
+  useSupabaseRealtime(`user-${userId}`, "messages-read", (payload: any) => {
+    const data = payload;
+    if (data && data.isRead && onMessagesRead) {
+      onMessagesRead();
+    }
+  });
 
   // استقبال إشعار "قيد الكتابة"
-  useEffect(() => {
-    if (!userId || !selectedUser) return;
-    let channel: any = null;
-    const setup = async () => {
-      try {
-        const PusherClient = (await import("pusher-js")).default;
-        const pusher = new PusherClient(
-          process.env.NEXT_PUBLIC_PUSHER_KEY || "45585387a0d70f319a67",
-          { cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || "eu" },
-        );
-        channel = pusher.subscribe(`user-${userId}`);
-        channel.bind("typing", (data: any) => {
-          if (data.userId === selectedUser?.id) {
-            setTypingUser(data.userId);
-            clearTimeout((window as any).__typingTimeout);
-            (window as any).__typingTimeout = setTimeout(
-              () => setTypingUser(null),
-              2000,
-            );
-          }
-        });
-      } catch {}
-    };
-    setup();
-    return () => {
-      if (channel) {
-        channel.unbind_all();
-        channel.unsubscribe();
+  useSupabaseRealtime(`user-${userId}`, "typing", (payload: any) => {
+    const data = payload;
+    if (data && selectedUser && data.userId === selectedUser.id) {
+      setTypingUser(data.userId);
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
       }
-    };
-  }, [userId, selectedUser]);
+      typingTimeoutRef.current = setTimeout(() => setTypingUser(null), 2000);
+    }
+  });
+
   // استقبال رسائل جديدة لحظياً
-  useEffect(() => {
-    if (!userId || !selectedUser) return;
-    let channel: any = null;
-    const setup = async () => {
+  useSupabaseRealtime(`user-${userId}`, "new-message", (payload: any) => {
+    const data = payload;
+    if (data && selectedUser && data.senderId === selectedUser.id) {
       try {
-        const PusherClient = (await import("pusher-js")).default;
-        const pusher = new PusherClient(
-          process.env.NEXT_PUBLIC_PUSHER_KEY || "45585387a0d70f319a67",
-          { cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || "eu" },
-        );
-        channel = pusher.subscribe(`user-${userId}`);
-        channel.bind("new-message", (data: any) => {
-          // إذا كانت الرسالة من نفس الشخص المفتوح معه المحادثة
-          if (selectedUser && data.senderId === selectedUser.id) {
-            // صوت
-            try {
-              new Audio("/sounds/notification.mp3").play().catch(() => {});
-            } catch {}
-            // أضف الرسالة مباشرة
-            if (onNewMessage) {
-              onNewMessage({
-                id: data.id || Date.now().toString(),
-                senderId: data.senderId,
-                receiverId: userId,
-                body: data.body,
-                isRead: true,
-                isEdited: false,
-                createdAt: data.createdAt || new Date().toISOString(),
-                sender: { id: data.senderId, name: data.sender?.name || "" },
-              });
-            }
-          } else {
-            // رسالة من شخص آخر أو خارج المحادثة -> تحديث القائمة لإظهار علامة غير مقروء
-            onMessageSent();
-          }
-        });
+        const audio = new Audio("/sounds/notification.mp3");
+        audio.volume = 0.5;
+        audio.play().catch(() => {});
       } catch {}
-    };
-    setup();
-    return () => {
-      if (channel) {
-        channel.unbind_all();
-        channel.unsubscribe();
+      if (onNewMessage) {
+        onNewMessage({
+          id: data.id || Date.now().toString(),
+          senderId: data.senderId,
+          receiverId: userId,
+          body: data.body,
+          isRead: true,
+          isEdited: false,
+          createdAt: data.createdAt || new Date().toISOString(),
+          sender: { id: data.senderId, name: data.sender?.name || "" },
+        });
       }
-    };
-  }, [userId, selectedUser, onMessageSent, onNewMessage]);
+    } else {
+      // لا تفعل شيئاً - تم إصلاح هذا من قبل
+    }
+  });
 
   // ==================== إرسال ====================
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedUser) return;
     const messageToSend = newMessage.trim();
     const tempId = `temp_${Date.now()}`;
+
+    // 1. إظهار الرسالة فوراً في الواجهة (Optimistic UI)
+    const optimisticMsg: Message = {
+      id: tempId,
+      senderId: userId,
+      receiverId: selectedUser.id,
+      body: messageToSend,
+      isRead: false,
+      isEdited: false,
+      createdAt: new Date().toISOString(),
+      sender: { id: userId, name: "أنت" },
+    };
+
+    if (onNewMessage) {
+      onNewMessage(optimisticMsg);
+    }
+
     setNewMessage("");
-    setReplyTo(null);
     setSendingMsgId(tempId);
     setLoading(true);
+
     try {
       const res = await csrfFetch("/api/chat/send", {
         method: "POST",
@@ -285,18 +252,13 @@ export default function ChatArea({
       const data = await res.json();
       if (data.success) {
         setSendingMsgId(null);
-        onMessageSent();
+        // لا نعيد تحميل الرسائل - optimistic update يكفي
       } else {
-        setSendingMsgId(null);
-        setFailedMsgId(tempId);
-        showToast(data.message, "error");
-        setNewMessage(messageToSend);
+        throw new Error(data.message);
       }
     } catch {
       setSendingMsgId(null);
       setFailedMsgId(tempId);
-      showToast("فشل الإرسال", "error");
-      setNewMessage(messageToSend);
     } finally {
       setLoading(false);
     }
@@ -940,18 +902,16 @@ export default function ChatArea({
           onKeyDown={(e) => e.key === "Enter" && sendMessage()}
           onFocus={() => {
             if (selectedUser && userId) {
-              import("pusher-js")
-                .then(({ default: PusherClient }) => {
-                  const pusher = new PusherClient(
-                    process.env.NEXT_PUBLIC_PUSHER_KEY || "",
-                    { cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || "eu" },
-                  );
-                  pusher.trigger(`user-${selectedUser.id}`, "typing", {
-                    userId,
-                    name: "",
-                  });
-                })
-                .catch(() => {});
+              try {
+                import("@/lib/supabaseRealtime")
+                  .then(({ broadcastEvent }) => {
+                    broadcastEvent(`user-${selectedUser.id}`, "typing", {
+                      userId,
+                      name: "",
+                    });
+                  })
+                  .catch(() => {});
+              } catch {}
             }
           }}
           style={{

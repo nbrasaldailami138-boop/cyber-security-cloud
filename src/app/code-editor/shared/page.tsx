@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import Sidebar from "@/components/layout/Sidebar";
 import PageTransition from "@/components/layout/PageTransition";
 import { useAuth } from "@/hooks/useAuth";
-import { usePusher } from "@/hooks/usePusher";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 import { useToast } from "@/components/ui/Toast";
 
 interface SharedFile {
@@ -74,7 +74,7 @@ export default function SharedFilesPage() {
     loadFiles();
   }, [loadFiles]);
 
-  usePusher("code-editor", "file-shared", () => {
+  useSupabaseRealtime("code-editor", "file-shared", () => {
     loadFiles();
     showToast("📢 تمت مشاركة ملف جديد", "info");
   });

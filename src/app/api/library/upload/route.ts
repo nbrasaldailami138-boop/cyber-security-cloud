@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { imagekit } from "@/lib/imagekit";
 import { APP_CONFIG } from "@/config";
 import { scanAndReject } from "@/lib/clamav";
-import { triggerChannelEvent } from "@/lib/pusherService";
+import { getSupabase } from "@/lib/supabaseRealtime";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
 
@@ -221,18 +221,18 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // إرسال إشعار عبر Pusher للمستوى
+    // إرسال إشعار عبر Supabase للمستوى
     try {
-      await triggerChannelEvent(
-        `library-level-${effectiveLevel}`,
-        "new-content",
-        {
+      const supabase = getSupabase();
+      await supabase.from("system_configs").upsert({
+        key: `ev_library-level-${effectiveLevel}_new-content_${Date.now()}`,
+        value: JSON.stringify({
           id: content.id,
           title: content.title,
           publisherName: user.name,
           type: content.type,
-        },
-      );
+        }),
+      });
     } catch {
       // فشل الإشعار لا يمنع النشر
     }

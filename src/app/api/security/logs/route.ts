@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyAccessToken } from "@/lib/auth";
 import { Ratelimit } from "@upstash/ratelimit";
@@ -193,10 +193,10 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // إرسال حدث Pusher لتحديث الطرفية والحارس
+    // إرسال حدث Supabase Broadcast لتحديث الطرفية والحارس
     try {
-      const { pusher: pusherServer } = await import("@/lib/pusher");
-      await pusherServer.trigger("security-terminal", "new-log", {
+      const { broadcastEvent } = await import("@/lib/supabaseRealtime");
+      await broadcastEvent("security-terminal", "new-log", {
         id: log.id,
         action: log.action,
         severity: log.severity,
@@ -205,11 +205,11 @@ export async function POST(request: NextRequest) {
         deviceInfo: log.deviceInfo,
         createdAt: log.createdAt.toISOString(),
       });
-      await pusherServer.trigger("security-radar", "stats-update", {
+      await broadcastEvent("security-radar", "stats-update", {
         timestamp: new Date().toISOString(),
       });
-    } catch (pusherError) {
-      console.error("Failed to send Pusher event:", pusherError);
+    } catch (supabaseError) {
+      console.error("Failed to send Supabase Broadcast event:", supabaseError);
     }
 
     return NextResponse.json({ success: true, data: log }, { status: 201 });

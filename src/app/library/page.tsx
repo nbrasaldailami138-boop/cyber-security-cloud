@@ -14,6 +14,7 @@ import { usePagination } from "@/hooks/usePagination";
 import { csrfFetch } from "@/lib/csrfClient";
 import { useAuthStore } from "@/store/authStore";
 import { APP_CONFIG } from "@/config";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 
 // ==================== الأنواع ====================
 type ContentType =
@@ -260,6 +261,16 @@ export default function LibraryPage() {
   const userLevel = user?.level || "";
   const userId = user?.id || "";
 
+  useSupabaseRealtime(`library-level-${userLevel}`, "new-content", () => {
+    loadContent();
+  });
+  useSupabaseRealtime(`library-level-${userLevel}`, "content-deleted", () => {
+    loadContent();
+  });
+  useSupabaseRealtime(`user-${userId}`, "notification", () => {
+    loadContent();
+  });
+
   // ==================== تحميل المحتوى ====================
   const loadContent = useCallback(async () => {
     try {
@@ -301,61 +312,6 @@ export default function LibraryPage() {
     loadContent();
     loadSubjects();
   }, [loadContent, loadSubjects]);
-
-  // ==================== Pusher للحظية ====================
-  useEffect(() => {
-    let libraryChannel: any = null;
-    let userChannel: any = null;
-    const setupPusher = async () => {
-      try {
-        const PusherLib = (await import("pusher-js")).default;
-        const pusherClient = new PusherLib(
-          process.env.NEXT_PUBLIC_PUSHER_KEY || "45585387a0d70f319a67",
-          {
-            cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || "eu",
-          },
-        );
-
-        // قناة المكتبة للمستوى
-        libraryChannel = pusherClient.subscribe(`library-level-${userLevel}`);
-        libraryChannel.bind("new-content", (data: any) => {
-          loadContent();
-          showToast(
-            `📚 ${data.publisherName || "مستخدم"} نشر محتوى جديداً`,
-            "info",
-          );
-        });
-        libraryChannel.bind("content-deleted", () => {
-          loadContent();
-          showToast("تم حذف محتوى من المكتبة", "warning");
-        });
-
-        // قناة المستخدم الشخصية للإشعارات
-        if (userId) {
-          userChannel = pusherClient.subscribe(`user-${userId}`);
-          userChannel.bind("notification", (data: any) => {
-            if (data.type === "NEW_CONTENT") {
-              loadContent();
-              showToast(`📚 ${data.body}`, "info");
-            }
-          });
-        }
-      } catch {
-        // صامت
-      }
-    };
-    if (userLevel) setupPusher();
-    return () => {
-      if (libraryChannel) {
-        libraryChannel.unbind_all();
-        libraryChannel.unsubscribe();
-      }
-      if (userChannel) {
-        userChannel.unbind_all();
-        userChannel.unsubscribe();
-      }
-    };
-  }, [userLevel, userId, loadContent, showToast]);
 
   // ==================== النشر ====================
   const handleUpload = async () => {

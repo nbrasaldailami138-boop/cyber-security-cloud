@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Sidebar from "@/components/layout/Sidebar";
 import PageTransition from "@/components/layout/PageTransition";
 import { useAuth } from "@/hooks/useAuth";
-import { usePusher } from "@/hooks/usePusher";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 
 interface SecurityStats {
   errors: number;
@@ -130,7 +130,7 @@ export default function SecurityRadarPage() {
     loadStats();
   }, [loadStats]);
 
-  usePusher("security-radar", "stats-update", () => {
+  useSupabaseRealtime("security-radar", "stats-update", () => {
     loadStats();
   });
 

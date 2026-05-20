@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { prisma } from "@/lib/prisma";
 import { generateSecureToken, hashToken } from "@/lib/security";
-import { pusher } from "@/lib/pusher";
+import { broadcastEvent } from "@/lib/supabaseRealtime";
 import { z } from "zod";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
@@ -140,9 +140,9 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // إرسال إشعار لحظي عبر Pusher
+    // إرسال إشعار لحظي عبر Supabase Broadcast
     try {
-      await pusher.trigger("generation-channel", "accounts-generated", {
+      broadcastEvent("generation-channel", "accounts-generated", {
         count: results.filter((r) => !r.error).length,
         role,
         level,

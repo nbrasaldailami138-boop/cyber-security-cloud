@@ -168,10 +168,10 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // إرسال حدث Pusher لتحديث صفحات الرادار لحظياً
+      // إرسال حدث Supabase Broadcast لتحديث صفحات الرادار لحظياً
       try {
-        const { pusher: pusherServer } = await import("@/lib/pusher");
-        await pusherServer.trigger("security-terminal", "new-log", {
+        const { broadcastEvent } = await import("@/lib/supabaseRealtime");
+        await broadcastEvent("security-terminal", "new-log", {
           id: failedLog.id,
           action: failedLog.action,
           severity: failedLog.severity,
@@ -180,10 +180,10 @@ export async function POST(request: NextRequest) {
           deviceInfo: failedLog.deviceInfo,
           createdAt: failedLog.createdAt.toISOString(),
         });
-        await pusherServer.trigger("security-radar", "stats-update", {
+        await broadcastEvent("security-radar", "stats-update", {
           timestamp: new Date().toISOString(),
         });
-        await pusherServer.trigger("security-guardian", "new-threat", {
+        await broadcastEvent("security-guardian", "new-threat", {
           id: failedLog.id,
           action: failedLog.action,
           severity: failedLog.severity,
@@ -193,8 +193,8 @@ export async function POST(request: NextRequest) {
           createdAt: failedLog.createdAt.toISOString(),
           user: { name: user.name, email: user.email, role: user.role },
         });
-      } catch (pusherError) {
-        console.error("Failed to send Pusher event:", pusherError);
+      } catch (broadcastError) {
+        console.error("Failed to send broadcast event:", broadcastError);
       }
       // إذا تم اعتبارها محاولة اختراق
       // إذا تم اعتبارها محاولة اختراق
@@ -229,9 +229,9 @@ export async function POST(request: NextRequest) {
             });
           }
 
-          // إرسال حدث Pusher للإشعارات
-          const { pusher } = await import("@/lib/pusher");
-          await pusher.trigger("security-guardian", "new-threat", {
+          // إرسال حدث Supabase Broadcast للإشعارات
+          const { broadcastEvent } = await import("@/lib/supabaseRealtime");
+          await broadcastEvent("security-guardian", "new-threat", {
             id: auditLog.id,
             action: auditLog.action,
             severity: auditLog.severity,
@@ -243,7 +243,7 @@ export async function POST(request: NextRequest) {
           });
 
           // تحديث الإحصائيات
-          await pusher.trigger("security-radar", "stats-update", {
+          await broadcastEvent("security-radar", "stats-update", {
             timestamp: new Date().toISOString(),
           });
 
@@ -259,6 +259,8 @@ export async function POST(request: NextRequest) {
             ).catch(() => {});
             // مع صوت alert
             try {
+              const { sendPushToUsers } =
+                await import("@/lib/pushNotifications");
               await sendPushToUsers(
                 admins.map((a: any) => a.id),
                 {
@@ -271,8 +273,8 @@ export async function POST(request: NextRequest) {
               );
             } catch {}
           }
-        } catch (pusherError) {
-          console.error("Failed to send Pusher event:", pusherError);
+        } catch (supabaseError) {
+          console.error("Failed to send Supabase Broadcast event:", supabaseError);
         }
 
         // إرسال إيميل تحذيري للأدمن

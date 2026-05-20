@@ -6,7 +6,7 @@ import { imagekit } from "@/lib/imagekit";
 import { APP_CONFIG } from "@/config";
 import { scanAndReject } from "@/lib/clamav";
 import * as XLSX from "xlsx";
-import { triggerChannelEvent } from "@/lib/pusherService";
+import { broadcastEvent } from "@/lib/supabaseRealtime";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
 
@@ -297,7 +297,7 @@ export async function POST(request: NextRequest) {
     });
 
     try {
-      await triggerChannelEvent(`user-${userId}`, "notification", {
+      broadcastEvent(`user-${userId}`, "notification", {
         type: "ANALYSIS_COMPLETED",
         title: "✅ اكتمل التحليل",
         body: `تم استخراج ${parsedStudents.length} طالب من ${file.name}`,

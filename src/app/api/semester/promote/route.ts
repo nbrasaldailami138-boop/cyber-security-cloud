@@ -225,17 +225,26 @@ export async function POST(request: NextRequest) {
       );
     } catch {}
 
-    // إرسال حدث Pusher
+    // إرسال حدث Supabase
     try {
-      const { pusher } = await import("@/lib/pusher");
-      await pusher.trigger("semester", "promotion-update", {
-        timestamp: new Date().toISOString(),
-        fromLevel: level,
-        toLevel: nextLevel,
-        count: students.length,
+      const { getSupabase } = await import("@/lib/supabaseRealtime");
+      const supabase = getSupabase();
+
+      await supabase.from("system_configs").upsert({
+        key: `ev_semester_promotion-update_${Date.now()}`,
+        value: JSON.stringify({
+          timestamp: new Date().toISOString(),
+          fromLevel: level,
+          toLevel: nextLevel,
+          count: students.length,
+        }),
       });
-      await pusher.trigger("semester", "stats-update", {
-        timestamp: new Date().toISOString(),
+
+      await supabase.from("system_configs").upsert({
+        key: `ev_semester_stats-update_${Date.now() + 1}`,
+        value: JSON.stringify({
+          timestamp: new Date().toISOString(),
+        }),
       });
     } catch {}
 

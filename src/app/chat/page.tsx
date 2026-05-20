@@ -102,39 +102,46 @@ export default function ChatPage() {
     loadConversations();
   }, [loadConversations]);
 
-  // ==================== Pusher ====================
+  // ==================== Supabase Realtime ====================
   useEffect(() => {
     if (!userId) return;
-    let channel: any = null;
-    const setup = async () => {
-      try {
-        const PusherClient = (await import("pusher-js")).default;
-        const pusher = new PusherClient(
-          process.env.NEXT_PUBLIC_PUSHER_KEY || "45585387a0d70f319a67",
-          { cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || "eu" },
-        );
-        channel = pusher.subscribe(`user-${userId}`);
-        channel.bind("new-message", (data: any) => {
-          loadConversations();
-          if (
-            selectedUser &&
-            (data.senderId === selectedUser.id ||
-              data.receiverId === selectedUser.id)
-          ) {
-            loadMessages(selectedUser.id);
-          }
-        });
-        channel.bind("message-sent", () => {
-          loadConversations();
-        });
-      } catch {}
-    };
-    setup();
+    const { getSupabase } = require("@/lib/supabaseRealtime");
+    const supabase = getSupabase();
+
+    const channel = supabase
+      .channel(`user-${userId}`)
+      .on("broadcast", { event: "new-message" }, (payload: any) => {
+        const data = payload.payload;
+        if (
+          selectedUser &&
+          (data.senderId === selectedUser.id ||
+            data.receiverId === selectedUser.id)
+        ) {
+          // إضافة الرسالة مباشرة للمحادثة الحالية دون reload
+          setMessages((prev) => {
+            const exists = prev.find((m) => m.id === data.id);
+            if (exists) return prev;
+            return [
+              ...prev,
+              {
+                id: data.id,
+                senderId: data.senderId,
+                receiverId: data.receiverId,
+                body: data.body,
+                isRead: data.senderId === userId ? false : true,
+                isEdited: false,
+                createdAt: data.createdAt,
+                sender: data.sender || { id: data.senderId, name: "" },
+              },
+            ];
+          });
+        }
+      })
+
+      .subscribe();
+
     return () => {
-      if (channel) {
-        channel.unbind_all();
-        channel.unsubscribe();
-      }
+      supabase.removeChannel(channel);
     };
   }, [userId, selectedUser, loadConversations]);
 
@@ -165,7 +172,7 @@ export default function ChatPage() {
       lastSeenAt: (chatUser as any).lastSeenAt,
       lastLoginAt: (chatUser as any).lastLoginAt,
     });
-    loadMessages(chatUser.id);
+    loadMessages((chatUser as any).userId || (chatUser as any).id);
     setShowMobileChat(true);
     setShowSearch(false);
     setSearchResults([]);
@@ -561,7 +568,6 @@ export default function ChatPage() {
               messages={messages}
               onClose={closeChat}
               onMessageSent={() => {
-                if (selectedUser) loadMessages(selectedUser.id);
                 loadConversations();
               }}
               onConversationDeleted={loadConversations}

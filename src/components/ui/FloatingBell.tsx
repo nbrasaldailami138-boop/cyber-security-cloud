@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/components/ui/Toast";
 import { useAuthStore } from "@/store/authStore";
 import { csrfFetch } from "@/lib/csrfClient";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 
 interface NotificationItem {
   id: string;
@@ -74,42 +75,19 @@ export default function FloatingBell() {
     loadNotifications();
   }, [loadNotifications]);
 
-  // ==================== Pusher للحظية ====================
-  useEffect(() => {
-    if (!userId) return;
-    let channel: any = null;
-    const setup = async () => {
-      try {
-        const PusherClient = (await import("pusher-js")).default;
-        const pusher = new PusherClient(
-          process.env.NEXT_PUBLIC_PUSHER_KEY || "45585387a0d70f319a67",
-          { cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || "eu" },
-        );
-        channel = pusher.subscribe(`user-${userId}`);
-        channel.bind("notification", (data: any) => {
-          loadNotifications();
-          // تشغيل صوت الإشعار
-          try {
-            const audio = new Audio("/sounds/notification.mp3");
-            audio.volume = 0.5;
-            audio.play().catch(() => {});
-          } catch {}
-          if (data.title && data.body) {
-            showToast(`🔔 ${data.title}: ${data.body}`, "info");
-          }
-        });
-      } catch {
-        /* صامت */
-      }
-    };
-    setup();
-    return () => {
-      if (channel) {
-        channel.unbind_all();
-        channel.unsubscribe();
-      }
-    };
-  }, [userId, loadNotifications, showToast]);
+  // ==================== Supabase Realtime للحظية ====================
+  useSupabaseRealtime(`user-${userId}`, "notification", (data: any) => {
+    loadNotifications();
+    // تشغيل صوت الإشعار
+    try {
+      const audio = new Audio("/sounds/notification.mp3");
+      audio.volume = 0.5;
+      audio.play().catch(() => {});
+    } catch {}
+    if (data.title && data.body) {
+      showToast(`🔔 ${data.title}: ${data.body}`, "info");
+    }
+  });
 
   // ==================== تحديد كمقروء والتوجيه ====================
   const handleClickNotification = async (notif: NotificationItem) => {

@@ -11,6 +11,7 @@ import PageTransition from "@/components/layout/PageTransition";
 import Pagination from "@/components/ui/Pagination";
 import { usePagination } from "@/hooks/usePagination";
 import { useAuthStore } from "@/store/authStore";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 
 interface LogItem {
   id: string;
@@ -60,6 +61,10 @@ export default function ManagementAuditLogPage() {
   const { showToast } = useToast();
   const userId = user?.id || "";
 
+  useSupabaseRealtime(`user-${userId}`, "notification", () => {
+    loadLogs();
+  });
+
   const [logs, setLogs] = useState<LogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -91,28 +96,6 @@ export default function ManagementAuditLogPage() {
     await loadLogs();
     setRefreshing(false);
   };
-
-  useEffect(() => {
-    if (!userId) return;
-    let channel: any = null;
-    (async () => {
-      try {
-        const P = (await import("pusher-js")).default;
-        const p = new P(
-          process.env.NEXT_PUBLIC_PUSHER_KEY || "45585387a0d70f319a67",
-          { cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || "eu" },
-        );
-        channel = p.subscribe(`user-${userId}`);
-        channel.bind("notification", () => loadLogs());
-      } catch {}
-    })();
-    return () => {
-      if (channel) {
-        channel.unbind_all();
-        channel.unsubscribe();
-      }
-    };
-  }, [userId, loadLogs]);
 
   const getSeverityColor = (s: string) =>
     ({

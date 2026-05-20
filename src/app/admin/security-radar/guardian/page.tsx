@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Sidebar from "@/components/layout/Sidebar";
 import PageTransition from "@/components/layout/PageTransition";
-import { usePusher } from "@/hooks/usePusher";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 
 interface ThreatEvent {
   id: string;
@@ -126,15 +126,19 @@ export default function GuardianPage() {
     loadData();
   }, [loadData]);
 
-  usePusher("security-guardian", "new-threat", (newThreat: ThreatEvent) => {
-    console.log("📥 Pusher new-threat received:", newThreat);
-    setEvents((prev) => [newThreat, ...prev]);
-    setStats((prev) => ({
-      ...prev,
-      attackAttempts: prev.attackAttempts + 1,
-      actionsTaken: prev.actionsTaken + 1,
-    }));
-  });
+  useSupabaseRealtime(
+    "security-guardian",
+    "new-threat",
+    (newThreat: ThreatEvent) => {
+      console.log("📥 Realtime new-threat received:", newThreat);
+      setEvents((prev) => [newThreat, ...prev]);
+      setStats((prev) => ({
+        ...prev,
+        attackAttempts: prev.attackAttempts + 1,
+        actionsTaken: prev.actionsTaken + 1,
+      }));
+    },
+  );
 
   const filteredEvents =
     activeTab === "all"

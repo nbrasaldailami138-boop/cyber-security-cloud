@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Sidebar from "@/components/layout/Sidebar";
 import PageTransition from "@/components/layout/PageTransition";
 import { useAuth } from "@/hooks/useAuth";
-import { usePusher } from "@/hooks/usePusher";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 
 interface TerminalLog {
   id: string;
@@ -94,8 +94,8 @@ export default function TerminalPage() {
     loadLogs();
   }, [loadLogs]);
 
-  usePusher("security-terminal", "new-log", (newLog: TerminalLog) => {
-    console.log("📥 Pusher new-log received:", newLog);
+  useSupabaseRealtime("security-terminal", "new-log", (newLog: TerminalLog) => {
+    console.log("📥 Realtime new-log received:", newLog);
     const enhanced = {
       ...newLog,
       file: extractFileFromDescription(newLog.description),

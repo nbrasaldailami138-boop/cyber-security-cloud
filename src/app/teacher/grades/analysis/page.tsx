@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/Toast";
 import PageTransition from "@/components/layout/PageTransition";
 import { useAuthStore } from "@/store/authStore";
 import { csrfFetch } from "@/lib/csrfClient";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 
 interface AnalysisRecord {
   id: string;
@@ -79,6 +80,10 @@ export default function AnalysisListPage() {
   const userName = user?.name || "";
   const userId = user?.id || "";
 
+  useSupabaseRealtime(`user-${userId}`, "notification", () => {
+    loadRecords();
+  });
+
   const [records, setRecords] = useState<AnalysisRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -109,48 +114,6 @@ export default function AnalysisListPage() {
   useEffect(() => {
     loadRecords();
   }, [loadRecords]);
-  useEffect(() => {
-    if (!userId) return;
-    let channel: any = null;
-    (async () => {
-      try {
-        const P = (await import("pusher-js")).default;
-        const p = new P(
-          process.env.NEXT_PUBLIC_PUSHER_KEY || "45585387a0d70f319a67",
-          { cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || "eu" },
-        );
-        channel = p.subscribe(`user-${userId}`);
-        channel.bind("notification", () => loadRecords());
-      } catch {}
-    })();
-    return () => {
-      if (channel) {
-        channel.unbind_all();
-        channel.unsubscribe();
-      }
-    };
-  }, [userId, loadRecords]);
-  useEffect(() => {
-    if (!userId) return;
-    let channel: any = null;
-    (async () => {
-      try {
-        const P = (await import("pusher-js")).default;
-        const p = new P(
-          process.env.NEXT_PUBLIC_PUSHER_KEY || "45585387a0d70f319a67",
-          { cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || "eu" },
-        );
-        channel = p.subscribe(`user-${userId}`);
-        channel.bind("notification", () => loadRecords());
-      } catch {}
-    })();
-    return () => {
-      if (channel) {
-        channel.unbind_all();
-        channel.unsubscribe();
-      }
-    };
-  }, [userId, loadRecords]);
 
   const [deleteConfirm, setDeleteConfirm] = useState<{
     show: boolean;

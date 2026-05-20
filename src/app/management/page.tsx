@@ -9,6 +9,7 @@ import Sidebar from "@/components/layout/Sidebar";
 import { useToast } from "@/components/ui/Toast";
 import PageTransition from "@/components/layout/PageTransition";
 import { useAuthStore } from "@/store/authStore";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 
 interface ServerStats {
   totalUsers: number;
@@ -47,6 +48,10 @@ export default function ManagementDashboard() {
   const userId = user?.id || "";
   const managementLevel = (user as any)?.managementLevel || "";
 
+  useSupabaseRealtime(`user-${userId}`, "notification", () => {
+    loadStats();
+  });
+
   const [stats, setStats] = useState<ServerStats>({
     totalUsers: 0,
     activeUsers: 0,
@@ -72,28 +77,6 @@ export default function ManagementDashboard() {
   useEffect(() => {
     loadStats();
   }, [loadStats]);
-
-  useEffect(() => {
-    if (!userId) return;
-    let channel: any = null;
-    (async () => {
-      try {
-        const P = (await import("pusher-js")).default;
-        const p = new P(
-          process.env.NEXT_PUBLIC_PUSHER_KEY || "45585387a0d70f319a67",
-          { cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || "eu" },
-        );
-        channel = p.subscribe(`user-${userId}`);
-        channel.bind("notification", () => loadStats());
-      } catch {}
-    })();
-    return () => {
-      if (channel) {
-        channel.unbind_all();
-        channel.unsubscribe();
-      }
-    };
-  }, [userId, loadStats]);
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });

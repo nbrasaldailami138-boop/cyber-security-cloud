@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Sidebar from "@/components/layout/Sidebar";
 import PageTransition from "@/components/layout/PageTransition";
 import { useAuth } from "@/hooks/useAuth";
-import { usePusher } from "@/hooks/usePusher";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 import { useToast } from "@/components/ui/Toast";
 import { csrfFetch } from "@/lib/csrfClient";
 
@@ -140,7 +140,7 @@ export default function CodeEditorPage() {
     }
   }, [userLevel]);
 
-  usePusher("code-editor", "file-shared", () => {
+  useSupabaseRealtime("code-editor", "file-shared", () => {
     showToast("📢 تمت مشاركة ملف جديد في محرر الأكواد", "info");
   });
 

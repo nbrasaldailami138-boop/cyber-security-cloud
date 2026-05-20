@@ -3,16 +3,23 @@ import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { prisma } from "@/lib/prisma";
 import { encryptMessage } from "@/lib/crypto";
-import DOMPurify from "dompurify";
-import { JSDOM } from "jsdom";
 import { messageRateLimiter } from "@/lib/ratelimit";
-import { triggerNewMessage, triggerNotification } from "@/lib/pusherService";
-import { sendPushNotification } from "@/lib/pushNotifications";
+import { broadcastEvent } from "@/lib/supabaseRealtime";
 import { z } from "zod";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
-const window = new JSDOM("").window;
-const purify = DOMPurify(window as any);
+
+// تهيئة JSDOM + DOMPurify مرة واحدة فقط (Lazy Initialization)
+let purifyInstance: any = null;
+function getPurify() {
+  if (!purifyInstance) {
+    const { JSDOM } = require("jsdom");
+    const DOMPurify = require("dompurify");
+    purifyInstance = DOMPurify(new JSDOM("").window);
+  }
+  return purifyInstance;
+}
+
 const messageSchema = z.object({
   receiverId: z.string().min(1, "المستقبل مطلوب"),
   body: z.string().min(1, "الرسالة فارغة").max(2000, "الرسالة طويلة جداً"),
@@ -34,8 +41,8 @@ export async function POST(request: NextRequest) {
     const senderId = payload.sub as string;
     const ip = request.headers.get("x-forwarded-for") || "unknown";
 
-    // Rate Limiting
-    const { success: rateLimitOk } = await messageRateLimiter.limit(ip);
+    // Rate Limiting (ربط بـ IP + senderId لمنع التجاوز)
+    const { success: rateLimitOk } = await messageRateLimiter.limit(`${ip}_${senderId}`);
     if (!rateLimitOk) {
       return NextResponse.json(
         { success: false, message: "رسائل كثيرة. انتظر قليلاً." },
@@ -55,13 +62,13 @@ export async function POST(request: NextRequest) {
     let { receiverId, body: messageBody, replyToId } = validation.data;
 
     // تعقيم الرسالة من XSS
-    messageBody = purify.sanitize(messageBody, { ALLOWED_TAGS: [] });
+    messageBody = getPurify().sanitize(messageBody, { ALLOWED_TAGS: [] });
 
-    // التحقق من صلاحية المراسلة (العزل الأكاديمي)
-    const sender = await prisma.user.findUnique({ where: { id: senderId } });
-    const receiver = await prisma.user.findUnique({
-      where: { id: receiverId },
-    });
+    // التحقق من صلاحية المراسلة (العزل الأكاديمي) - استعلام واحد متوازي
+    const [sender, receiver] = await Promise.all([
+      prisma.user.findUnique({ where: { id: senderId } }),
+      prisma.user.findUnique({ where: { id: receiverId } }),
+    ]);
 
     if (!sender || !receiver) {
       return NextResponse.json(
@@ -139,7 +146,6 @@ export async function POST(request: NextRequest) {
         where: { id: receiverId },
         select: { lastSeenAt: true },
       });
-      // إذا كان آخر ظهور للمستخدم خلال آخر دقيقتين، نعتبره داخل المحادثة
       if (
         userStatus?.lastSeenAt &&
         Date.now() - new Date(userStatus.lastSeenAt).getTime() < 2 * 60 * 1000
@@ -148,7 +154,7 @@ export async function POST(request: NextRequest) {
       }
     } catch {}
 
-    // إنشاء إشعار (غير متزامن - لا ننتظره)
+    // إنشاء إشعار داخلي (غير متزامن)
     prisma.notification
       .create({
         data: {
@@ -161,30 +167,34 @@ export async function POST(request: NextRequest) {
       })
       .catch(() => {});
 
-    // إرسال إشعار فوري عبر Pusher (غير متزامن) - هذا ضروري لتحديث الواجهة
-    triggerNewMessage(senderId, receiverId, {
+    // إرسال الأحداث اللحظية عبر Supabase Broadcast (Fire and Forget)
+    broadcastEvent(`user-${receiverId}`, "new-message", {
       id: message.id,
+      senderId,
+      receiverId,
       body: messageBody,
       createdAt: message.createdAt.toISOString(),
       sender: { id: senderId, name: sender.name },
-    }).catch(() => {});
+    });
+
+    broadcastEvent(`user-${senderId}`, "new-message", {
+      id: message.id,
+      senderId,
+      receiverId,
+      body: messageBody,
+      createdAt: message.createdAt.toISOString(),
+      sender: { id: senderId, name: sender.name },
+    });
 
     // إرسال الإشعارات المنبثقة والخارجية فقط إذا لم يكن المستقبل داخل المحادثة
     if (!isInChatWithSender) {
-      triggerNotification(receiverId, {
+      broadcastEvent(`user-${receiverId}`, "notification", {
         id: message.id,
         type: "NEW_MESSAGE",
         title: "رسالة جديدة",
         body: `رسالة جديدة من ${sender.name}`,
         linkUrl: "/chat",
-      }).catch(() => {});
-
-      sendPushNotification(
-        receiverId,
-        "💬 رسالة جديدة",
-        `رسالة جديدة من ${sender.name}`,
-        "/chat",
-      ).catch(() => {});
+      });
 
       import("@/lib/pushNotifications")
         .then(({ sendPushToUsers }) => {

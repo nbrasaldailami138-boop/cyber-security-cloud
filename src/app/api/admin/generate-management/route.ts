@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { prisma } from "@/lib/prisma";
 import { generateSecureToken, hashToken } from "@/lib/security";
-import { pusher } from "@/lib/pusher";
+import { broadcastEvent } from "@/lib/supabaseRealtime";
 import { z } from "zod";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
@@ -18,18 +18,27 @@ export async function POST(request: NextRequest) {
     const cookieStore = await cookies();
     const accessToken = cookieStore.get("accessToken")?.value;
     if (!accessToken) {
-      return NextResponse.json({ success: false, message: "غير مصرح" }, { status: 401 });
+      return NextResponse.json(
+        { success: false, message: "غير مصرح" },
+        { status: 401 },
+      );
     }
 
     const { payload } = await jwtVerify(accessToken, ACCESS_SECRET);
     if (payload.role !== "ADMIN") {
-      return NextResponse.json({ success: false, message: "غير مصرح - هذه الخاصية للأدمن فقط" }, { status: 403 });
+      return NextResponse.json(
+        { success: false, message: "غير مصرح - هذه الخاصية للأدمن فقط" },
+        { status: 403 },
+      );
     }
 
     const body = await request.json();
     const validation = schema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json({ success: false, message: validation.error.issues[0].message }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: validation.error.issues[0].message },
+        { status: 400 },
+      );
     }
 
     const { name, level } = validation.data;
@@ -86,7 +95,7 @@ export async function POST(request: NextRequest) {
     });
 
     try {
-      await pusher.trigger("generation-channel", "management-generated", {
+      broadcastEvent("generation-channel", "management-generated", {
         name,
         level,
         timestamp: new Date().toISOString(),
@@ -101,6 +110,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error("Generate Management Error:", error);
-    return NextResponse.json({ success: false, message: "حدث خطأ في السيرفر" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: "حدث خطأ في السيرفر" },
+      { status: 500 },
+    );
   }
 }

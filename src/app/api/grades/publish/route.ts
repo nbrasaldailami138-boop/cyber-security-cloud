@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { prisma } from "@/lib/prisma";
-import { triggerChannelEvent } from "@/lib/pusherService";
+import { getSupabase } from "@/lib/supabaseRealtime";
 import { sendPushToUsers } from "@/lib/pushNotifications";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
@@ -147,11 +147,15 @@ export async function POST(request: NextRequest) {
         });
 
         try {
-          await triggerChannelEvent(`user-${sn.id}`, "notification", {
-            type: "GRADES_DISTRIBUTED",
-            title: "📊 توزيع درجات",
-            body,
-            linkUrl: "/student",
+          const supabase = getSupabase();
+          await supabase.from("system_configs").upsert({
+            key: `ev_user-${sn.id}_notification_${Date.now()}_${Math.random()}`,
+            value: JSON.stringify({
+              type: "GRADES_DISTRIBUTED",
+              title: "📊 توزيع درجات",
+              body,
+              linkUrl: "/student",
+            }),
           });
         } catch {}
       }

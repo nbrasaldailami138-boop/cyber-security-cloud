@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { prisma } from "@/lib/prisma";
-import {
-  triggerNotification,
-  triggerAssignmentUpdate,
-} from "@/lib/pusherService";
+import { getSupabase } from "@/lib/supabaseRealtime";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
 
@@ -105,20 +102,37 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // إشعار فوري عبر Pusher
-    await triggerNotification(assignment.studentId, {
-      id: notification.id,
-      type: "ASSIGNMENT_EVALUATED",
-      title: "تم تقييم التكليف",
-      body: `تم تقييم تكليفك في مادة ${assignment.subject.name} بمقدار ${grade} درجة`,
-      linkUrl: "/student",
-    });
-    await triggerAssignmentUpdate(assignment.studentId, {
-      id: assignmentId,
-      subjectName: assignment.subject.name,
-      grade,
-      status: "evaluated",
-    });
+    // إشعار فوري عبر Supabase
+    const supabase = getSupabase();
+
+    // إشعار notification للطالب
+    await supabase
+      .from("system_configs")
+      .upsert({
+        key: `ev_user-${assignment.studentId}_notification_${Date.now()}`,
+        value: JSON.stringify({
+          id: notification.id,
+          type: "ASSIGNMENT_EVALUATED",
+          title: "تم تقييم التكليف",
+          body: `تم تقييم تكليفك في مادة ${assignment.subject.name} بمقدار ${grade} درجة`,
+          linkUrl: "/student",
+        }),
+      })
+      .catch(() => {});
+
+    // إشعار assignment-update للطالب
+    await supabase
+      .from("system_configs")
+      .upsert({
+        key: `ev_user-${assignment.studentId}_assignment-update_${Date.now()}`,
+        value: JSON.stringify({
+          id: assignmentId,
+          subjectName: assignment.subject.name,
+          grade,
+          status: "evaluated",
+        }),
+      })
+      .catch(() => {});
     // إرسال Push Notification مع صوت
     try {
       const { sendPushToUsers } = await import("@/lib/pushNotifications");

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
 import PageTransition from "@/components/layout/PageTransition";
 import { useAuth } from "@/hooks/useAuth";
-import { usePusher } from "@/hooks/usePusher";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 
 interface SemesterStats {
   totalLevels: number;
@@ -52,7 +52,7 @@ export default function SemesterPage() {
     loadStats();
   }, [loadStats]);
 
-  usePusher("semester", "stats-update", () => {
+  useSupabaseRealtime("semester", "stats-update", () => {
     loadStats();
   });
 

@@ -3,13 +3,16 @@ import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { prisma } from "@/lib/prisma";
 import { generateSecureToken, hashToken } from "@/lib/security";
-import { pusher } from "@/lib/pusher";
+import { broadcastEvent } from "@/lib/supabaseRealtime";
 import { z } from "zod";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
 
 const schema = z.object({
-  names: z.array(z.string().min(2, "الاسم قصير جداً")).min(1, "يجب إدخال اسم واحد على الأقل").max(500, "حد أقصى 500 اسم"),
+  names: z
+    .array(z.string().min(2, "الاسم قصير جداً"))
+    .min(1, "يجب إدخال اسم واحد على الأقل")
+    .max(500, "حد أقصى 500 اسم"),
   level: z.enum(["LEVEL_1", "LEVEL_2"]),
 });
 
@@ -18,18 +21,27 @@ export async function POST(request: NextRequest) {
     const cookieStore = await cookies();
     const accessToken = cookieStore.get("accessToken")?.value;
     if (!accessToken) {
-      return NextResponse.json({ success: false, message: "غير مصرح" }, { status: 401 });
+      return NextResponse.json(
+        { success: false, message: "غير مصرح" },
+        { status: 401 },
+      );
     }
 
     const { payload } = await jwtVerify(accessToken, ACCESS_SECRET);
     if (payload.role !== "ADMIN" && payload.role !== "MANAGEMENT") {
-      return NextResponse.json({ success: false, message: "غير مصرح" }, { status: 403 });
+      return NextResponse.json(
+        { success: false, message: "غير مصرح" },
+        { status: 403 },
+      );
     }
 
     const body = await request.json();
     const validation = schema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json({ success: false, message: validation.error.issues[0].message }, { status: 400 });
+      return NextResponse.json(
+        { success: false, message: validation.error.issues[0].message },
+        { status: 400 },
+      );
     }
 
     const { names, level } = validation.data;
@@ -38,7 +50,10 @@ export async function POST(request: NextRequest) {
 
     // MANAGEMENT can only generate for their own level
     if (payload.role === "MANAGEMENT" && payload.level !== level) {
-      return NextResponse.json({ success: false, message: "لا يمكنك التوليد لمستوى غير مستواك" }, { status: 403 });
+      return NextResponse.json(
+        { success: false, message: "لا يمكنك التوليد لمستوى غير مستواك" },
+        { status: 403 },
+      );
     }
 
     const results: any[] = [];
@@ -100,8 +115,8 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      await pusher.trigger("generation-channel", "students-generated", {
-        count: results.filter(r => r.success).length,
+      broadcastEvent("generation-channel", "students-generated", {
+        count: results.filter((r) => r.success).length,
         level,
         timestamp: new Date().toISOString(),
         generatedBy: generatorName,
@@ -110,11 +125,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `تم توليد ${results.filter(r => r.success).length} حساب بنجاح`,
+      message: `تم توليد ${results.filter((r) => r.success).length} حساب بنجاح`,
       data: results,
     });
   } catch (error: any) {
     console.error("Generate Students Error:", error);
-    return NextResponse.json({ success: false, message: "حدث خطأ في السيرفر" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, message: "حدث خطأ في السيرفر" },
+      { status: 500 },
+    );
   }
 }

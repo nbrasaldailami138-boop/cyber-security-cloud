@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { prisma } from "@/lib/prisma";
+import { broadcastEvent } from "@/lib/supabaseRealtime";
 import { decryptMessage, encryptMessage } from "@/lib/crypto";
 import DOMPurify from "dompurify";
 import { JSDOM } from "jsdom";
@@ -34,6 +35,10 @@ export async function GET(request: NextRequest) {
 
     if (!otherUserId) {
       // جلب قائمة المحادثات
+      const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+      const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "20")));
+      const skip = (page - 1) * limit;
+
       const messages = await prisma.message.findMany({
         where: {
           OR: [
@@ -42,27 +47,21 @@ export async function GET(request: NextRequest) {
           ],
         },
         orderBy: { createdAt: "desc" },
-        take: 100,
-        include: {
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          senderId: true,
+          receiverId: true,
+          body: true,
+          encrypted: true,
+          isRead: true,
+          createdAt: true,
           sender: {
-            select: {
-              id: true,
-              name: true,
-              role: true,
-              level: true,
-              lastSeenAt: true,
-              lastLoginAt: true,
-            },
+            select: { id: true, name: true, role: true, level: true, lastSeenAt: true, lastLoginAt: true },
           },
           receiver: {
-            select: {
-              id: true,
-              name: true,
-              role: true,
-              level: true,
-              lastSeenAt: true,
-              lastLoginAt: true,
-            },
+            select: { id: true, name: true, role: true, level: true, lastSeenAt: true, lastLoginAt: true },
           },
         },
       });
@@ -94,36 +93,37 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, data: conversations });
     } else {
       // جلب رسائل محادثة محددة
+      const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+      const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "30")));
+      const skip = (page - 1) * limit;
+
       const messages = await prisma.message.findMany({
         where: {
           AND: [
             { deletedAt: null },
             {
               OR: [
-                {
-                  senderId: userId,
-                  receiverId: otherUserId,
-                  senderDeleted: false,
-                },
-                {
-                  senderId: otherUserId,
-                  receiverId: userId,
-                  receiverDeleted: false,
-                },
+                { senderId: userId, receiverId: otherUserId, senderDeleted: false },
+                { senderId: otherUserId, receiverId: userId, receiverDeleted: false },
               ],
             },
           ],
         },
         orderBy: { createdAt: "asc" },
-        take: 100,
-        include: {
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          senderId: true,
+          receiverId: true,
+          body: true,
+          encrypted: true,
+          isRead: true,
+          isEdited: true,
+          createdAt: true,
           sender: { select: { id: true, name: true } },
           replyTo: {
-            select: {
-              id: true,
-              body: true,
-              sender: { select: { id: true, name: true } },
-            },
+            select: { id: true, body: true, sender: { select: { id: true, name: true } } },
           },
         },
       });
@@ -154,11 +154,10 @@ export async function GET(request: NextRequest) {
         data: { isRead: true },
       });
 
-      // إرسال إشعار Pusher للمرسل بأن رسائله قُرئت
+      // إرسال إشعار Supabase للمرسل بأن رسائله قُرئت
       if (updatedCount.count > 0) {
         try {
-          const { pusher: pusherServer } = await import("@/lib/pusher");
-          await pusherServer.trigger(`user-${otherUserId}`, "messages-read", {
+          broadcastEvent(`user-${otherUserId}`, "messages-read", {
             readBy: userId,
             timestamp: new Date().toISOString(),
           });

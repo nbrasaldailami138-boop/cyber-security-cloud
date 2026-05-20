@@ -8,6 +8,7 @@ import PageTransition from "@/components/layout/PageTransition";
 import { useAuth } from "@/hooks/useAuth";
 import { csrfFetch } from "@/lib/csrfClient";
 import { useNotificationStore } from "@/store/notificationStore";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 
 const typeIcons: Record<string, string> = {
   NEW_MESSAGE: "💬",
@@ -53,39 +54,16 @@ export default function NotificationsPage() {
     fetchNotifications();
   }, [page]);
 
-  // استقبال الإشعارات الفورية عبر Pusher
-  useEffect(() => {
-    if (!user?.id) return;
-    let unsubscribe: (() => void) | undefined;
-
-    const setupPusher = async () => {
-      const PusherClient = (await import("pusher-js")).default;
-      const pusher = new PusherClient(
-        process.env.NEXT_PUBLIC_PUSHER_KEY || "",
-        { cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || "eu" },
-      );
-
-      const channel = pusher.subscribe(`user-${user.id}`);
-      channel.bind("notification", (data: any) => {
-        addNotification(data);
-        // تشغيل صوت الإشعار
-        try {
-          const audio = new Audio("/sounds/notification.mp3");
-          audio.volume = 0.5;
-          audio.play().catch(() => {});
-        } catch {}
-      });
-
-      unsubscribe = () => {
-        channel.unbind("notification");
-        pusher.unsubscribe(`user-${user.id}`);
-        pusher.disconnect();
-      };
-    };
-
-    setupPusher();
-    return () => unsubscribe?.();
-  }, [user?.id]);
+  // استقبال الإشعارات الفورية عبر Supabase Realtime
+  useSupabaseRealtime(`user-${user?.id}`, "notification", (data: any) => {
+    addNotification(data);
+    // تشغيل صوت الإشعار
+    try {
+      const audio = new Audio("/sounds/notification.mp3");
+      audio.volume = 0.5;
+      audio.play().catch(() => {});
+    } catch {}
+  });
 
   const fetchNotifications = async () => {
     setLoading(true);

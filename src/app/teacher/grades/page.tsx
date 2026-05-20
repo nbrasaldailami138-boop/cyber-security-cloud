@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/Toast";
 import PageTransition from "@/components/layout/PageTransition";
 import { useAuthStore } from "@/store/authStore";
 import { csrfFetch } from "@/lib/csrfClient";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 
 interface TeacherSubject {
   id: string;
@@ -94,6 +95,10 @@ export default function TeacherGradesPage() {
   const userId = user?.id || "";
   const userLevel = user?.level || "";
 
+  useSupabaseRealtime(`user-${userId}`, "notification", () => {
+    loadDistributions();
+  });
+
   const [mySubject, setMySubject] = useState<TeacherSubject | null>(null);
   const [distributions, setDistributions] = useState<DistributionRecord[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -141,28 +146,6 @@ export default function TeacherGradesPage() {
   useEffect(() => {
     loadDistributions();
   }, [loadDistributions]);
-
-  useEffect(() => {
-    if (!userId) return;
-    let channel: any = null;
-    (async () => {
-      try {
-        const P = (await import("pusher-js")).default;
-        const p = new P(
-          process.env.NEXT_PUBLIC_PUSHER_KEY || "45585387a0d70f319a67",
-          { cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || "eu" },
-        );
-        channel = p.subscribe(`user-${userId}`);
-        channel.bind("notification", () => loadDistributions());
-      } catch {}
-    })();
-    return () => {
-      if (channel) {
-        channel.unbind_all();
-        channel.unsubscribe();
-      }
-    };
-  }, [userId, loadDistributions]);
 
   const handleUpload = async (directFile?: File) => {
     const fileToUpload = directFile || file;

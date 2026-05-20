@@ -12,6 +12,7 @@ import Pagination from "@/components/ui/Pagination";
 import { usePagination } from "@/hooks/usePagination";
 import { useAuthStore } from "@/store/authStore";
 import { csrfFetch } from "@/lib/csrfClient";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 
 // ==================== الأنواع ====================
 interface Announcement {
@@ -99,6 +100,13 @@ export default function CreateAnnouncementPage() {
   const userLevel = user?.level || "";
   const userId = user?.id || "";
 
+  useSupabaseRealtime(`user-${userId}`, "notification", (data: any) => {
+    if (data.type === "NEW_ANNOUNCEMENT") {
+      showToast("📢 تعميم جديد", "info");
+      loadHistory();
+    }
+  });
+
   // تبويب: نشر أو سجل
   type Tab = "create" | "history";
   const [tab, setTab] = useState<Tab>("create");
@@ -150,39 +158,6 @@ export default function CreateAnnouncementPage() {
   useEffect(() => {
     if (tab === "history") loadHistory();
   }, [tab, loadHistory]);
-
-  // ==================== Pusher ====================
-  useEffect(() => {
-    if (!userId || !userLevel) return;
-    let channel: any = null;
-    const setup = async () => {
-      try {
-        const PusherClient = (await import("pusher-js")).default;
-        const pusher = new PusherClient(
-          process.env.NEXT_PUBLIC_PUSHER_KEY || "45585387a0d70f319a67",
-          {
-            cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || "eu",
-          },
-        );
-        channel = pusher.subscribe(`user-${userId}`);
-        channel.bind("notification", (data: any) => {
-          if (data.type === "NEW_ANNOUNCEMENT") {
-            showToast(`📢 ${data.title}: ${data.body}`, "info");
-            if (tab === "history") loadHistory();
-          }
-        });
-      } catch {
-        /* صامت */
-      }
-    };
-    setup();
-    return () => {
-      if (channel) {
-        channel.unbind_all();
-        channel.unsubscribe();
-      }
-    };
-  }, [userId, userLevel, tab, loadHistory, showToast]);
 
   // ==================== نشر تعميم ====================
   const handleSubmit = async () => {

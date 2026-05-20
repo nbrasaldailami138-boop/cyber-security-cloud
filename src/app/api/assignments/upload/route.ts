@@ -4,7 +4,7 @@ import { jwtVerify } from "jose";
 import { prisma } from "@/lib/prisma";
 import { imagekit } from "@/lib/imagekit";
 import { APP_CONFIG } from "@/config";
-import { triggerNotification } from "@/lib/pusherService";
+import { broadcastEvent } from "@/lib/supabaseRealtime";
 import { scanAndReject } from "@/lib/clamav";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
@@ -145,7 +145,7 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      await triggerNotification(subject.teacherId, {
+      broadcastEvent(`user-${subject.teacherId}`, "notification", {
         id: notif.id,
         type: "NEW_ASSIGNMENT",
         title: "تكليف جديد",

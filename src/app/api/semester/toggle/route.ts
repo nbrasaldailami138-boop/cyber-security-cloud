@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyAccessToken } from "@/lib/auth";
 
@@ -64,10 +64,10 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // إرسال حدث Pusher
+    // إرسال حدث Supabase Broadcast
     try {
-      const { pusher } = await import("@/lib/pusher");
-      await pusher.trigger("semester", "subjects-update", {
+      const { broadcastEvent } = await import("@/lib/supabaseRealtime");
+      broadcastEvent("semester", "subjects-update", {
         timestamp: new Date().toISOString(),
         isVisible,
         count: subjectIds.length,

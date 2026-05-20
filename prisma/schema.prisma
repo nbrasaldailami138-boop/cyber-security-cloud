@@ -139,6 +139,10 @@ model Message {
   replyTo      Message?  @relation("MessageReplies", fields: [replyToId], references: [id])
   replies      Message[] @relation("MessageReplies")
 
+  @@index([senderId, receiverId, createdAt(sort: Desc)])
+  @@index([receiverId, senderId, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+  @@index([deletedAt])
   @@map("messages")
 }
 

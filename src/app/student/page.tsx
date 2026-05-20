@@ -12,6 +12,7 @@ import Pagination from "@/components/ui/Pagination";
 import { usePagination } from "@/hooks/usePagination";
 import { useAuthStore } from "@/store/authStore";
 import { csrfFetch } from "@/lib/csrfClient";
+import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
 
 // ==================== الأنواع ====================
 interface Subject {
@@ -125,6 +126,17 @@ export default function StudentDashboard() {
   const userName = user?.name || "";
   const userLevel = user?.level || "";
 
+  useSupabaseRealtime(`user-${userId}`, "assignment-update", (data: any) => {
+    loadAssignments();
+    if (data.grade !== undefined) {
+      showToast(`✅ تم تقييم ${data.subjectName}: ${data.grade}`, "success");
+    }
+  });
+  useSupabaseRealtime(`user-${userId}`, "notification", () => {
+    loadAssignments();
+    loadGrades();
+  });
+
   // التبويبات
   type Tab = "upload" | "assignments" | "grades";
   const [activeTab, setActiveTab] = useState<Tab>("upload");
@@ -217,52 +229,6 @@ export default function StudentDashboard() {
   useEffect(() => {
     if (activeTab === "grades") loadGrades();
   }, [activeTab, gradesPag.page]);
-
-  // ==================== Pusher للحظية ====================
-  useEffect(() => {
-    let channel: any = null;
-    const setup = async () => {
-      try {
-        const PusherClient = (await import("pusher-js")).default;
-        const pusher = new PusherClient(
-          process.env.NEXT_PUBLIC_PUSHER_KEY || "45585387a0d70f319a67",
-          {
-            cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || "eu",
-          },
-        );
-        channel = pusher.subscribe(`user-${userId}`);
-        channel.bind("assignment-update", (data: any) => {
-          loadAssignments();
-          if (data.grade !== undefined) {
-            showToast(
-              `📝 تم تقييم تكليفك في ${data.subjectName} بدرجة ${data.grade}`,
-              "success",
-            );
-          }
-        });
-        channel.bind("notification", (data: any) => {
-          if (data.type === "ASSIGNMENT_EVALUATED") {
-            loadAssignments();
-            loadGrades();
-            showToast(`✅ ${data.body}`, "success");
-          }
-          if (data.type === "GRADES_DISTRIBUTED") {
-            loadGrades();
-            showToast(`📊 ${data.body}`, "info");
-          }
-        });
-      } catch {
-        /* صامت */
-      }
-    };
-    if (userId) setup();
-    return () => {
-      if (channel) {
-        channel.unbind_all();
-        channel.unsubscribe();
-      }
-    };
-  }, [userId, loadAssignments, loadGrades, showToast]);
 
   // ==================== رفع التكليف ====================
   const handleUpload = async () => {
