@@ -78,19 +78,12 @@ export async function POST(request: NextRequest) {
       create: { key: "code_editor_shares", value: JSON.stringify(shares) },
     });
 
-    // إرسال إشعار عبر Supabase
-    const supabase = getSupabase();
-    await supabase
-      .from("system_configs")
-      .upsert({
-        key: `ev_code-editor_file-shared_${Date.now()}`,
-        value: JSON.stringify({
-          fileName,
-          level: level || payload.level,
-          authorName: showAuthor !== false ? payload.email : "مجهول",
-        }),
-      })
-      .catch(() => {});
+    // إرسال إشعار عبر Supabase Realtime
+    broadcastEvent("code-editor", "file-shared", {
+      fileName,
+      level: level || payload.level,
+      authorName: showAuthor !== false ? payload.email : "مجهول",
+    });
 
     // إرسال إشعارات داخلية للمستخدمين في نفس المستوى
     const usersInLevel = await prisma.user.findMany({
@@ -102,19 +95,21 @@ export async function POST(request: NextRequest) {
       select: { id: true },
     });
 
-    for (const u of usersInLevel) {
-      if (u.id === payload.sub) continue;
-      await prisma.notification
-        .create({
-          data: {
-            userId: u.id,
-            type: "NEW_CONTENT",
-            title: "📢 ملف مشترك جديد",
-            body: `تمت مشاركة ملف "${fileName}" في محرر الأكواد`,
-            linkUrl: "/code-editor/shared",
-          },
-        })
-        .catch(() => {});
+    // إنشاء إشعارات داخلية دفعة واحدة
+    const notificationsData = usersInLevel
+      .filter((u) => u.id !== payload.sub)
+      .map((u) => ({
+        userId: u.id,
+        type: "NEW_CONTENT" as const,
+        title: "📢 ملف مشترك جديد",
+        body: `تمت مشاركة ملف "${fileName}" في محرر الأكواد`,
+        linkUrl: "/code-editor/shared",
+      }));
+
+    if (notificationsData.length > 0) {
+      await prisma.notification.createMany({
+        data: notificationsData,
+      });
     }
 
     // إرسال إشعارات خارجية (Push)

@@ -599,7 +599,7 @@ export default function TerminalPage() {
                       {log.file && (
                         <span style={{ color: "#00e5ff" }}>
                           → {log.file}
-                          {log.line > 0 && `:${log.line}`}
+                          {(log.line ?? 0) > 0 && `:${log.line}`}
                         </span>
                       )}
                     </motion.div>
@@ -787,7 +787,7 @@ export default function TerminalPage() {
                       }}
                     >
                       {selectedLog.file}
-                      {selectedLog.line > 0 && ` :${selectedLog.line}`}
+                      {(selectedLog.line ?? 0) > 0 && ` :${selectedLog.line}`}
                     </code>
                   </div>
                 )}

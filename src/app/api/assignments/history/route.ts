@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
     const { payload } = await jwtVerify(accessToken, ACCESS_SECRET);
     const userId = payload.sub as string;
     const userRole = payload.role as string;
+    const userLevel = payload.level as string | undefined;
 
     if (
       userRole !== "TEACHER" &&
@@ -63,6 +64,10 @@ export async function GET(request: NextRequest) {
         });
       }
       where.subjectId = { in: ids };
+    }
+
+    if (userRole === "MANAGEMENT" && userLevel) {
+      where.subject = { level: userLevel as any };
     }
 
     if (subjectId) {

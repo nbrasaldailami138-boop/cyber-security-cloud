@@ -2,15 +2,28 @@ import type { CSSProperties } from "react";
 
 export const colors = {
   primary: "#00e5ff",
+  secondary: "#39ff14",
   bg: "#010204",
+  bgNavy: "#0a1128",
   card: "rgba(22,27,34,0.6)",
+  cardBg: "#161b22",
   cardBorder: "rgba(255,255,255,0.08)",
+  inputBg: "#0d1117",
   text: "#e6edf3",
   muted: "#8b949e",
   success: "#2ea043",
   danger: "#f85149",
   warning: "#ffca28",
   accent: "#bf5af2",
+  supabase: "#3ecf8e",
+  adminCyan: "#00e5ff",
+  adminRed: "#ff3131",
+  adminGreen: "#39ff14",
+  adminGold: "#ffca28",
+  roleAdmin: "#ff3131",
+  roleManagement: "#ffca28",
+  roleTeacher: "#bf5af2",
+  roleStudent: "#00e5ff",
 } as const;
 
 export const glassCard: CSSProperties = {

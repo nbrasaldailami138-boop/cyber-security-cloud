@@ -11,11 +11,11 @@ const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
 
 // تهيئة JSDOM + DOMPurify مرة واحدة فقط (Lazy Initialization)
 let purifyInstance: any = null;
-function getPurify() {
+async function getPurify() {
   if (!purifyInstance) {
-    const { JSDOM } = require("jsdom");
-    const DOMPurify = require("dompurify");
-    purifyInstance = DOMPurify(new JSDOM("").window);
+    const { JSDOM } = await import("jsdom");
+    const DOMPurify = (await import("dompurify")).default;
+    purifyInstance = DOMPurify(new JSDOM("").window as any);
   }
   return purifyInstance;
 }
@@ -42,7 +42,9 @@ export async function POST(request: NextRequest) {
     const ip = request.headers.get("x-forwarded-for") || "unknown";
 
     // Rate Limiting (ربط بـ IP + senderId لمنع التجاوز)
-    const { success: rateLimitOk } = await messageRateLimiter.limit(`${ip}_${senderId}`);
+    const { success: rateLimitOk } = await messageRateLimiter.limit(
+      `${ip}_${senderId}`,
+    );
     if (!rateLimitOk) {
       return NextResponse.json(
         { success: false, message: "رسائل كثيرة. انتظر قليلاً." },
@@ -59,10 +61,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let { receiverId, body: messageBody, replyToId } = validation.data;
+    const { receiverId, body: rawMessageBody, replyToId } = validation.data;
 
     // تعقيم الرسالة من XSS
-    messageBody = getPurify().sanitize(messageBody, { ALLOWED_TAGS: [] });
+    const messageBody = (await getPurify()).sanitize(rawMessageBody, { ALLOWED_TAGS: [] });
 
     // التحقق من صلاحية المراسلة (العزل الأكاديمي) - استعلام واحد متوازي
     const [sender, receiver] = await Promise.all([
@@ -94,7 +96,36 @@ export async function POST(request: NextRequest) {
     }
 
     // العزل الأكاديمي
-    if (sender.role === "STUDENT") {
+    const isAdmin = sender.role === "ADMIN";
+    if (isAdmin) {
+      // ADMIN يستطيع مراسلة الجميع
+    } else if (sender.role === "MANAGEMENT") {
+      // الإدارة: ترسل لنفس مستواها فقط
+      if (receiver.role === "TEACHER" || receiver.role === "STUDENT") {
+        if (receiver.level !== sender.level) {
+          return NextResponse.json(
+            { success: false, message: "لا يمكنك مراسلة مستخدمين من مستوى آخر" },
+            { status: 403 },
+          );
+        }
+      }
+    } else if (sender.role === "TEACHER") {
+      // المعلم: يرسل لنفس مستواه فقط
+      if (receiver.role === "TEACHER") {
+        return NextResponse.json(
+          { success: false, message: "لا يمكنك مراسلة معلم آخر" },
+          { status: 403 },
+        );
+      }
+      if (receiver.role === "STUDENT" || receiver.role === "MANAGEMENT") {
+        if (receiver.level !== sender.level) {
+          return NextResponse.json(
+            { success: false, message: "لا يمكنك مراسلة مستخدمين من مستوى آخر" },
+            { status: 403 },
+          );
+        }
+      }
+    } else if (sender.role === "STUDENT") {
       if (receiver.role === "STUDENT") {
         return NextResponse.json(
           { success: false, message: "لا يمكنك مراسلة طالب آخر" },
@@ -109,13 +140,6 @@ export async function POST(request: NextRequest) {
           );
         }
       }
-    }
-
-    if (sender.role === "TEACHER" && receiver.role === "TEACHER") {
-      return NextResponse.json(
-        { success: false, message: "لا يمكنك مراسلة معلم آخر" },
-        { status: 403 },
-      );
     }
 
     // تشفير الرسالة
@@ -139,19 +163,11 @@ export async function POST(request: NextRequest) {
       })
       .catch(() => {});
 
-    // التحقق من حالة المستخدم: هل هو في نفس المحادثة؟
+    // التحقق من حالة المستخدم عبر Presence (WebSocket)
     let isInChatWithSender = false;
     try {
-      const userStatus = await prisma.user.findUnique({
-        where: { id: receiverId },
-        select: { lastSeenAt: true },
-      });
-      if (
-        userStatus?.lastSeenAt &&
-        Date.now() - new Date(userStatus.lastSeenAt).getTime() < 2 * 60 * 1000
-      ) {
-        isInChatWithSender = true;
-      }
+      const { isUserOnline } = await import("@/lib/supabaseRealtime");
+      isInChatWithSender = isUserOnline(receiverId);
     } catch {}
 
     // إنشاء إشعار داخلي (غير متزامن)

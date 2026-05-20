@@ -31,9 +31,13 @@ export function verifyTwoFACode(secret: string, token: string): boolean {
 export function generateBackupCodes(): string[] {
   const codes: string[] = [];
   for (let i = 0; i < 8; i++) {
-    const code = Array.from({ length: 4 }, () =>
-      Math.floor(Math.random() * 10).toString(),
-    ).join("");
+    const bytes = new Uint8Array(2);
+    crypto.getRandomValues(bytes);
+    const code =
+      (bytes[0] % 10).toString() +
+      (bytes[1] % 10).toString() +
+      ((bytes[0] >> 4) % 10).toString() +
+      ((bytes[1] >> 4) % 10).toString();
     codes.push(code);
   }
   return codes;

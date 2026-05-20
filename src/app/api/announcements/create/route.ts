@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { prisma } from "@/lib/prisma";
-import { getSupabase } from "@/lib/supabaseRealtime";
+import { broadcastEvent } from "@/lib/supabaseRealtime";
 import { sendPushToUsers } from "@/lib/pushNotifications";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
@@ -99,23 +99,14 @@ export async function POST(request: NextRequest) {
         /* صامت */
       }
 
-      // إشعار لحظي لكل مستخدم عبر Supabase
-      const supabase = getSupabase();
-      for (const u of usersInLevel) {
-        try {
-          await supabase.from("system_configs").upsert({
-            key: `ev_user-${u.id}_notification_${Date.now()}_${Math.random()}`,
-            value: JSON.stringify({
-              type: "NEW_ANNOUNCEMENT",
-              title: "📢 تعميم جديد",
-              body: title.trim(),
-              linkUrl: "/announcements/create?tab=history",
-            }),
-          });
-        } catch {
-          /* صامت */
-        }
-      }
+      // إشعار لحظي لجميع مستخدمي المستوى دفعة واحدة
+      broadcastEvent(`level-${targetLevel}`, "new-announcement", {
+        type: "NEW_ANNOUNCEMENT",
+        title: "📢 تعميم جديد",
+        body: title.trim(),
+        linkUrl: "/announcements/create?tab=history",
+        level: targetLevel,
+      });
     }
 
     await prisma.auditLog.create({
@@ -133,11 +124,9 @@ export async function POST(request: NextRequest) {
       success: true,
       message: "تم نشر التعميم بنجاح",
     });
-  } catch {
-    return NextResponse.json(
-      { success: false, message: "حدث خطأ" },
-      { status: 500 },
-    );
+  } catch (error) {
+    console.error("Announcements error:", error);
+    return NextResponse.json({ success: false, message: "حدث خطأ" }, { status: 500 });
   }
 }
 
@@ -166,10 +155,22 @@ export async function GET(request: NextRequest) {
 
     const where: any = { deletedAt: null };
 
-    if (userRole !== "ADMIN") {
-      where.publisherId = userId;
-    } else if (searchParams.get("level")) {
-      where.level = searchParams.get("level");
+    if (userRole === "ADMIN") {
+      if (searchParams.get("level")) {
+        where.level = searchParams.get("level");
+      }
+    } else if (userRole === "TEACHER") {
+      // المعلم يرى تعاميمه + تعاميم مستواه
+      where.OR = [
+        { publisherId: userId },
+        { level: userLevel },
+      ];
+    } else if (userRole === "MANAGEMENT") {
+      // الإدارة ترى تعاميم مستواها
+      where.level = userLevel;
+    } else {
+      // الطالب يرى تعاميم مستواه فقط
+      where.level = userLevel;
     }
 
     const [data, total] = await Promise.all([
@@ -192,11 +193,9 @@ export async function GET(request: NextRequest) {
       page,
       totalPages: Math.ceil(total / limit),
     });
-  } catch {
-    return NextResponse.json(
-      { success: false, message: "حدث خطأ" },
-      { status: 500 },
-    );
+  } catch (error) {
+    console.error("Announcements error:", error);
+    return NextResponse.json({ success: false, message: "حدث خطأ" }, { status: 500 });
   }
 }
 
@@ -243,11 +242,9 @@ export async function PATCH(request: NextRequest) {
     });
 
     return NextResponse.json({ success: true, message: "تم تعديل التعميم" });
-  } catch {
-    return NextResponse.json(
-      { success: false, message: "حدث خطأ" },
-      { status: 500 },
-    );
+  } catch (error) {
+    console.error("Announcements error:", error);
+    return NextResponse.json({ success: false, message: "حدث خطأ" }, { status: 500 });
   }
 }
 
@@ -291,10 +288,8 @@ export async function DELETE(request: NextRequest) {
     });
 
     return NextResponse.json({ success: true, message: "تم حذف التعميم" });
-  } catch {
-    return NextResponse.json(
-      { success: false, message: "حدث خطأ" },
-      { status: 500 },
-    );
+  } catch (error) {
+    console.error("Announcements error:", error);
+    return NextResponse.json({ success: false, message: "حدث خطأ" }, { status: 500 });
   }
 }

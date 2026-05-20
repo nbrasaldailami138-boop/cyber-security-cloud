@@ -26,10 +26,14 @@ export async function GET(request: NextRequest) {
     // العزل الأكاديمي: المستخدم يرى ملفاته فقط
     const folder = `/code-editor/${level}/${payload.sub}`;
 
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20")));
+    const skip = (page - 1) * limit;
+
     const files = await imagekit.listFiles({
       path: folder,
-      skip: 0,
-      limit: 100,
+      skip,
+      limit,
     });
 
     const data = files.map((f: any) => ({

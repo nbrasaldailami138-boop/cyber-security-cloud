@@ -29,10 +29,12 @@ export async function GET(request: NextRequest) {
     const userLevel = payload.level;
 
     const levels = ["LEVEL_1", "LEVEL_2", "LEVEL_3", "LEVEL_4"];
-    const availableLevels =
+    const availableLevels: string[] =
       effectiveRole === "ADMIN"
         ? ["LEVEL_1", "LEVEL_2", "LEVEL_3", "LEVEL_4"]
-        : [userLevel];
+        : userLevel
+          ? [userLevel]
+          : [];
 
     const levelLabels: Record<string, string> = {
       LEVEL_1: "المستوى الأول",

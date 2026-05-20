@@ -77,6 +77,10 @@ model User {
   subjectsTaught         Subject[]        @relation("TeacherSubjects")
   promotionRequests      PromotionRequest[] @relation("PromotionRequestedBy")
 
+  @@index([role])
+  @@index([level])
+  @@index([status])
+  @@index([deletedAt])
   @@map("users")
 }
 
@@ -92,6 +96,7 @@ model Session {
   createdAt    DateTime  @default(now())
   revokedAt    DateTime?
 
+  @@index([userId])
   @@map("sessions")
 }
 
@@ -113,6 +118,10 @@ model Subject {
   content       Content[]
   gradeDistributions GradeDistribution[]
 
+  @@index([level])
+  @@index([deletedAt])
+  @@index([teacherId])
+  @@index([semester])
   @@map("subjects")
 }
 
@@ -143,6 +152,7 @@ model Message {
   @@index([receiverId, senderId, createdAt(sort: Desc)])
   @@index([createdAt(sort: Desc)])
   @@index([deletedAt])
+  @@index([isBlocked])
   @@map("messages")
 }
 
@@ -176,6 +186,10 @@ model Content {
   deletedAt   DateTime?
   version     Int         @default(1)
 
+  @@index([level])
+  @@index([publisherId])
+  @@index([deletedAt])
+  @@index([createdAt(sort: Desc)])
   @@map("content")
 }
 
@@ -191,6 +205,9 @@ model Announcement {
   updatedAt   DateTime      @updatedAt
   deletedAt   DateTime?
 
+  @@index([level])
+  @@index([publisherId])
+  @@index([deletedAt])
   @@map("announcements")
 }
 
@@ -215,6 +232,11 @@ model Assignment {
   updatedAt     DateTime     @updatedAt
   deletedAt     DateTime?
 
+  @@index([studentId, subjectId])
+  @@index([subjectId])
+  @@index([deletedAt])
+  @@index([status])
+  @@index([evaluatorId])
   @@map("assignments")
 }
 
@@ -234,6 +256,8 @@ model GradeDistribution {
   createdAt   DateTime      @default(now())
   deletedAt   DateTime?
 
+  @@index([teacherId, subjectId])
+  @@index([level])
   @@map("grade_distributions")
 }
 
@@ -260,6 +284,7 @@ model Notification {
   isRead    Boolean          @default(false)
   createdAt DateTime         @default(now())
 
+  @@index([userId, createdAt(sort: Desc)])
   @@map("notifications")
 }
 
@@ -272,6 +297,8 @@ model UploadPermission {
   grantedAt DateTime @default(now())
   revokedAt DateTime?
 
+  @@index([userId])
+  @@index([revokedAt])
   @@map("upload_permissions")
 }
 
@@ -313,6 +340,10 @@ model AuditLog {
   metadata    Json?
   createdAt   DateTime      @default(now())
 
+  @@index([userId])
+  @@index([action])
+  @@index([severity])
+  @@index([createdAt(sort: Desc)])
   @@map("audit_logs")
 }
 
@@ -328,6 +359,10 @@ model ActivationCode {
   createdAt DateTime      @default(now())
   expiresAt DateTime
 
+  @@index([level])
+  @@index([role])
+  @@index([usedAt])
+  @@index([expiresAt])
   @@map("activation_codes")
 }
 
@@ -349,6 +384,9 @@ model PromotionRequest {
   approvedAt   DateTime?
   createdAt    DateTime        @default(now())
 
+  @@index([userId])
+  @@index([status])
+  @@index([toLevel])
   @@map("promotion_requests")
 }
 
@@ -368,6 +406,9 @@ model GenerationLog {
   createdAt       DateTime      @default(now())
   deletedAt       DateTime?
 
+  @@index([level])
+  @@index([role])
+  @@index([deletedAt])
   @@map("generation_logs")
 }
 
@@ -380,6 +421,7 @@ model PushSubscription {
   p256dhKey  String
   createdAt  DateTime @default(now())
 
+  @@index([userId])
   @@map("push_subscriptions")
 }
 

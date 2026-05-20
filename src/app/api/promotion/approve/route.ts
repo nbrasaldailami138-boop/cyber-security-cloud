@@ -93,10 +93,8 @@ export async function POST(request: NextRequest) {
       message: action === "APPROVED" ? "تمت الموافقة على الطلبات" : "تم رفض الطلبات",
       count: requests.length,
     });
-  } catch {
-    return NextResponse.json(
-      { success: false, message: "حدث خطأ" },
-      { status: 500 },
-    );
+  } catch (error) {
+    console.error("Promotion approve error:", error);
+    return NextResponse.json({ success: false, message: "حدث خطأ" }, { status: 500 });
   }
 }

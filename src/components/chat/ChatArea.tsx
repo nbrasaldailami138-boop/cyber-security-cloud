@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/components/ui/Toast";
 import { csrfFetch } from "@/lib/csrfClient";
 import { useSupabaseRealtime } from "@/hooks/useSupabaseRealtime";
+import { getOnlineUsers } from "@/lib/supabaseRealtime";
 
 // ==================== الأنواع ====================
 interface ChatUser {
@@ -133,6 +134,17 @@ export default function ChatArea({
   }>({ show: false, title: "", message: "", action: "" });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
+
+  // تتبع المستخدمين المتصلين عبر Presence
+  useEffect(() => {
+    const unsubscribe = getOnlineUsers((users) => {
+      setOnlineUsers(new Set(users));
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   // تفعيل الصوت (يحتاج تفاعل مستخدم مرة واحدة)
   useEffect(() => {
@@ -167,51 +179,47 @@ export default function ChatArea({
       }
     };
   }, []);
-  // تحديث ✓✓ لحظي عند قراءة الرسائل
-  useSupabaseRealtime(`user-${userId}`, "messages-read", (payload: any) => {
-    const data = payload;
-    if (data && data.isRead && onMessagesRead) {
-      onMessagesRead();
-    }
-  });
-
-  // استقبال إشعار "قيد الكتابة"
-  useSupabaseRealtime(`user-${userId}`, "typing", (payload: any) => {
-    const data = payload;
-    if (data && selectedUser && data.userId === selectedUser.id) {
-      setTypingUser(data.userId);
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
+  // قناة موحدة لجميع الأحداث
+  const { sendBroadcast } = useSupabaseRealtime(`user-${userId}`, [
+    { event: "messages-read", handler: (payload: any) => {
+      const data = payload;
+      if (data && data.isRead && onMessagesRead) {
+        onMessagesRead();
       }
-      typingTimeoutRef.current = setTimeout(() => setTypingUser(null), 2000);
-    }
-  });
-
-  // استقبال رسائل جديدة لحظياً
-  useSupabaseRealtime(`user-${userId}`, "new-message", (payload: any) => {
-    const data = payload;
-    if (data && selectedUser && data.senderId === selectedUser.id) {
-      try {
-        const audio = new Audio("/sounds/notification.mp3");
-        audio.volume = 0.5;
-        audio.play().catch(() => {});
-      } catch {}
-      if (onNewMessage) {
-        onNewMessage({
-          id: data.id || Date.now().toString(),
-          senderId: data.senderId,
-          receiverId: userId,
-          body: data.body,
-          isRead: true,
-          isEdited: false,
-          createdAt: data.createdAt || new Date().toISOString(),
-          sender: { id: data.senderId, name: data.sender?.name || "" },
-        });
+    }},
+    { event: "typing", handler: (payload: any) => {
+      const data = payload;
+      if (data && selectedUser && data.userId === selectedUser.id) {
+        setTypingUser(data.userId);
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
+        }
+        typingTimeoutRef.current = setTimeout(() => setTypingUser(null), 2000);
       }
-    } else {
-      // لا تفعل شيئاً - تم إصلاح هذا من قبل
-    }
-  });
+    }},
+    { event: "new-message", handler: (payload: any) => {
+      const data = payload;
+      if (data && selectedUser && data.senderId === selectedUser.id) {
+        try {
+          const audio = new Audio("/sounds/notification.mp3");
+          audio.volume = 0.5;
+          audio.play().catch(() => {});
+        } catch {}
+        if (onNewMessage) {
+          onNewMessage({
+            id: data.id || Date.now().toString(),
+            senderId: data.senderId,
+            receiverId: userId,
+            body: data.body,
+            isRead: true,
+            isEdited: false,
+            createdAt: data.createdAt || new Date().toISOString(),
+            sender: { id: data.senderId, name: data.sender?.name || "" },
+          });
+        }
+      }
+    }},
+  ]);
 
   // ==================== إرسال ====================
   const sendMessage = async () => {
@@ -446,12 +454,11 @@ export default function ChatArea({
   const formatDate = (d: string) =>
     new Date(d).toLocaleDateString("ar-YE", { month: "short", day: "numeric" });
   const isOnline = (u: ChatUser) => {
-    if (!u.lastSeenAt) return false;
-    return Date.now() - new Date(u.lastSeenAt).getTime() < 5 * 60 * 1000;
+    return onlineUsers.has(u.id);
   };
   const lastSeenText = (u: ChatUser) => {
-    if (!u.lastSeenAt) return "";
     if (isOnline(u)) return "متصل الآن";
+    if (!u.lastSeenAt) return "";
     return `آخر ظهور: ${formatDate(u.lastSeenAt)} ${formatTime(u.lastSeenAt)}`;
   };
 

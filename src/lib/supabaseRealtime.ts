@@ -14,11 +14,12 @@ export function getSupabase() {
 
 // ==================== نظام Broadcast عبر WebSocket ====================
 
-const channels: Record<string, { channel: any; ready: boolean; queue: any[] }> = {};
+const channels: Record<string, { channel: any; ready: boolean; queue: any[] }> =
+  {};
 
 function getOrCreateChannel(channelName: string) {
   if (!channels[channelName]) {
-    const entry = { channel: null, ready: false, queue: [] as any[] };
+    const entry: { channel: any; ready: boolean; queue: any[] } = { channel: null, ready: false, queue: [] };
 
     const channel = supabase.channel(channelName, {
       config: { broadcast: { self: true } },
@@ -74,9 +75,69 @@ export function broadcastEvent(
   }
 }
 
+// ==================== نظام Presence ====================
+
+export function trackPresence(userId: string): void {
+  try {
+    const channel = supabase.channel(`presence-online`, {
+      config: { presence: { key: userId } },
+    });
+
+    channel.subscribe(async (status: string) => {
+      if (status === "SUBSCRIBED") {
+        await channel.track({
+          userId,
+          online_at: new Date().toISOString(),
+        });
+      }
+    });
+  } catch {
+    // Silent fail
+  }
+}
+
+export function getOnlineUsers(
+  callback: (users: string[]) => void,
+): () => void {
+  try {
+    const channel = supabase.channel(`presence-online`, {
+      config: { presence: { key: "listener" } },
+    });
+
+    channel
+      .on("presence", { event: "sync" }, () => {
+        const state = channel.presenceState();
+        const onlineUsers = Object.keys(state);
+        callback(onlineUsers);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel).catch(() => {});
+    };
+  } catch {
+    return () => {};
+  }
+}
+
+export function isUserOnline(userId: string): boolean {
+  try {
+    const channel = supabase.channel(`presence-online`, {
+      config: { presence: { key: "check" } },
+    });
+    const state = channel.presenceState();
+    return Object.keys(state).includes(userId);
+  } catch {
+    return false;
+  }
+}
+
 const supabaseRealtime = {
   getSupabase,
   broadcastEvent,
+  trackPresence,
+  getOnlineUsers,
+  isUserOnline,
 };
 
 export default supabaseRealtime;

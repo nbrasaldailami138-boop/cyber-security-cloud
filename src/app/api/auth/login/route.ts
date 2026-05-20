@@ -217,17 +217,15 @@ export async function POST(request: NextRequest) {
             select: { id: true },
           });
 
-          for (const admin of admins) {
-            await prisma.notification.create({
-              data: {
-                userId: admin.id,
-                type: "NEW_ANNOUNCEMENT",
-                title: "🚨 محاولة اختراق",
-                body: `محاولة اختراق على الحساب ${user.email} من IP ${ip}`,
-                linkUrl: "/admin/security-radar/guardian",
-              },
-            });
-          }
+          await prisma.notification.createMany({
+            data: admins.map((admin) => ({
+              userId: admin.id,
+              type: "NEW_ANNOUNCEMENT",
+              title: "🚨 محاولة اختراق",
+              body: `محاولة اختراق على الحساب ${user.email} من IP ${ip}`,
+              linkUrl: "/admin/security-radar/guardian",
+            })),
+          });
 
           // إرسال حدث Supabase Broadcast للإشعارات
           const { broadcastEvent } = await import("@/lib/supabaseRealtime");

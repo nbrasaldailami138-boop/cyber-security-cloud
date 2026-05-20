@@ -43,9 +43,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const isCurrentValid = await argon2.verify(
-      user.passwordHash,
+    const isCurrentValid = await bcrypt.compare(
       currentPassword,
+      user.passwordHash,
     );
     if (!isCurrentValid) {
       return NextResponse.json(
@@ -54,7 +54,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const newHash = await argon2.hash(newPassword);
+    const salt = await bcrypt.genSalt(12);
+    const newHash = await bcrypt.hash(newPassword, salt);
 
     await prisma.user.update({
       where: { id: userId },
@@ -80,10 +81,8 @@ export async function POST(request: NextRequest) {
       success: true,
       message: "تم تغيير كلمة المرور بنجاح",
     });
-  } catch {
-    return NextResponse.json(
-      { success: false, message: "حدث خطأ" },
-      { status: 500 },
-    );
+  } catch (error) {
+    console.error("Change password error:", error);
+    return NextResponse.json({ success: false, message: "حدث خطأ أثناء تغيير كلمة المرور" }, { status: 500 });
   }
 }

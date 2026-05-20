@@ -5,7 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { imagekit } from "@/lib/imagekit";
 import { APP_CONFIG } from "@/config";
 import { scanAndReject } from "@/lib/clamav";
-import { getSupabase } from "@/lib/supabaseRealtime";
+import { broadcastEvent } from "@/lib/supabaseRealtime";
+import { sendPushToUsers } from "@/lib/pushNotifications";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
 
@@ -223,15 +224,14 @@ export async function POST(request: NextRequest) {
 
     // إرسال إشعار عبر Supabase للمستوى
     try {
-      const supabase = getSupabase();
-      await supabase.from("system_configs").upsert({
-        key: `ev_library-level-${effectiveLevel}_new-content_${Date.now()}`,
-        value: JSON.stringify({
-          id: content.id,
-          title: content.title,
-          publisherName: user.name,
-          type: content.type,
-        }),
+      broadcastEvent(`library-level-${effectiveLevel}`, "new-content", {
+        id: content.id,
+        title: content.title,
+        type: content.type,
+        fileUrl: content.fileUrl,
+        youtubeUrl: content.youtubeUrl,
+        publisherName: user.name,
+        createdAt: content.createdAt.toISOString(),
       });
     } catch {
       // فشل الإشعار لا يمنع النشر
@@ -260,7 +260,6 @@ export async function POST(request: NextRequest) {
         await prisma.notification.createMany({ data: notifications });
 
         // إرسال Push Notifications لكل المستخدمين في المستوى
-        const { sendPushToUsers } = await import("@/lib/pushNotifications");
         await sendPushToUsers(
           usersInLevel.map((u) => u.id),
           {

@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     }
 
     const effectiveRole = payload.managementLevel ? "MANAGEMENT" : payload.role;
-    const userLevel = payload.level;
+    const userLevel = payload.level || "LEVEL_1";
 
     const levels = ["LEVEL_1", "LEVEL_2", "LEVEL_3", "LEVEL_4"];
     const availableLevels =
@@ -225,26 +225,17 @@ export async function POST(request: NextRequest) {
       );
     } catch {}
 
-    // إرسال حدث Supabase
+    // إرسال حدث Supabase Realtime
     try {
-      const { getSupabase } = await import("@/lib/supabaseRealtime");
-      const supabase = getSupabase();
-
-      await supabase.from("system_configs").upsert({
-        key: `ev_semester_promotion-update_${Date.now()}`,
-        value: JSON.stringify({
-          timestamp: new Date().toISOString(),
-          fromLevel: level,
-          toLevel: nextLevel,
-          count: students.length,
-        }),
+      const { broadcastEvent } = await import("@/lib/supabaseRealtime");
+      broadcastEvent("semester", "promotion-update", {
+        timestamp: new Date().toISOString(),
+        fromLevel: level,
+        toLevel: nextLevel,
+        count: students.length,
       });
-
-      await supabase.from("system_configs").upsert({
-        key: `ev_semester_stats-update_${Date.now() + 1}`,
-        value: JSON.stringify({
-          timestamp: new Date().toISOString(),
-        }),
+      broadcastEvent("semester", "stats-update", {
+        timestamp: new Date().toISOString(),
       });
     } catch {}
 

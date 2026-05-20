@@ -16,4 +16,20 @@ const logger = winston.createLogger({
   ],
 });
 
+// تسجيل أخطاء Supabase Realtime
+export function logBroadcastError(
+  channel: string,
+  event: string,
+  error: unknown,
+): void {
+  logger.error("Broadcast failed", { channel, event, error });
+}
+
+export function logSecurityEvent(
+  action: string,
+  details: Record<string, unknown>,
+): void {
+  logger.warn("Security event", { action, ...details });
+}
+
 export default logger;

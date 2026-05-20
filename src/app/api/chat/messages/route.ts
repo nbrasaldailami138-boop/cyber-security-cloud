@@ -28,10 +28,17 @@ export async function GET(request: NextRequest) {
     const { payload } = await jwtVerify(accessToken, ACCESS_SECRET);
     const userId = payload.sub as string;
     const userRole = payload.role as string;
-    const userLevel = payload.level as string;
+    const userLevel = payload.level as string | null;
 
     const { searchParams } = new URL(request.url);
     const otherUserId = searchParams.get("userId");
+
+    // التحقق من العزل الأكاديمي
+    function isSameLevel(targetUserLevel: string | null): boolean {
+      if (userRole === "ADMIN") return true;
+      if (!targetUserLevel || !userLevel) return false;
+      return targetUserLevel === userLevel;
+    }
 
     if (!otherUserId) {
       // جلب قائمة المحادثات
@@ -74,6 +81,8 @@ export async function GET(request: NextRequest) {
         const key = other.id;
         if (!seen.has(key)) {
           seen.add(key);
+          // العزل الأكاديمي: تخطي المحادثات من مستويات مختلفة (لغير ADMIN)
+          if (!isSameLevel(other.level)) continue;
           const body = msg.encrypted ? decryptMessage(msg.body) : msg.body;
           conversations.push({
             userId: other.id,
@@ -93,6 +102,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, data: conversations });
     } else {
       // جلب رسائل محادثة محددة
+      // العزل الأكاديمي: التحقق من أن المستخدم الآخر في نفس المستوى
+      const otherUser = await prisma.user.findUnique({
+        where: { id: otherUserId, deletedAt: null },
+        select: { id: true, level: true },
+      });
+      if (!otherUser) {
+        return NextResponse.json(
+          { success: false, message: "المستخدم غير موجود" },
+          { status: 404 },
+        );
+      }
+      if (!isSameLevel(otherUser.level)) {
+        return NextResponse.json(
+          { success: false, message: "غير مصرح بالوصول لمحادثات هذا المستخدم" },
+          { status: 403 },
+        );
+      }
+
       const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
       const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "30")));
       const skip = (page - 1) * limit;

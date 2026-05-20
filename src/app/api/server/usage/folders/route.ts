@@ -35,8 +35,8 @@ export async function GET(request: NextRequest) {
     const result: Record<string, any> = {};
 
     for (const file of allFiles) {
-      const filePath = file.filePath || "/";
-      const pathParts = filePath.split("/").filter((p) => p);
+      const filePath = (file as any).filePath || (file as any).path || "/";
+      const pathParts = filePath.split("/").filter((p: string) => p);
 
       let level = "غير مصنف";
       // استخراج المستوى من مسار code-editor (مثل /code-editor/LEVEL_1/...)
@@ -120,12 +120,13 @@ export async function GET(request: NextRequest) {
       else if (filePath.includes("/assignments/")) uploadedBy = "طالب";
       else if (filePath.includes("/grades/")) uploadedBy = "معلم";
 
+      const f = file as any;
       result[level][subFolder].files.push({
-        fileId: file.fileId,
-        name: file.name,
-        url: file.url,
-        size: file.size || 0,
-        updatedAt: file.updatedAt || file.createdAt,
+        fileId: f.fileId,
+        name: f.name,
+        url: f.url,
+        size: f.size || 0,
+        updatedAt: f.updatedAt || f.createdAt,
         path: filePath,
         uploadedBy,
         targetUser,

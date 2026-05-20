@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
@@ -8,6 +8,7 @@ import Sidebar from "@/components/layout/Sidebar";
 import PageTransition from "@/components/layout/PageTransition";
 import { useAuthStore } from "@/store/authStore";
 import ChatArea from "@/components/chat/ChatArea";
+import { getSupabase, trackPresence } from "@/lib/supabaseRealtime";
 
 // ==================== الأنواع ====================
 interface ChatUser {
@@ -65,10 +66,13 @@ export default function ChatPage() {
   const user = useAuthStore((s) => s.user);
   const userId = user?.id || "";
   const userRole = user?.role || "";
-
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedUser, setSelectedUser] = useState<ChatUser | null>(null);
+  const selectedUserRef = useRef(selectedUser);
+  useEffect(() => {
+    selectedUserRef.current = selectedUser;
+  }, [selectedUser]);
   const [showMobileChat, setShowMobileChat] = useState(false);
   const [convLoading, setConvLoading] = useState(true);
 
@@ -102,49 +106,64 @@ export default function ChatPage() {
     loadConversations();
   }, [loadConversations]);
 
-  // ==================== Supabase Realtime ====================
+  // ==================== قناة Supabase موحدة ====================
   useEffect(() => {
     if (!userId) return;
-    const { getSupabase } = require("@/lib/supabaseRealtime");
-    const supabase = getSupabase();
+    let channel: any = null;
+    let isDestroyed = false;
 
-    const channel = supabase
-      .channel(`user-${userId}`)
-      .on("broadcast", { event: "new-message" }, (payload: any) => {
-        const data = payload.payload;
-        if (
-          selectedUser &&
-          (data.senderId === selectedUser.id ||
-            data.receiverId === selectedUser.id)
-        ) {
-          // إضافة الرسالة مباشرة للمحادثة الحالية دون reload
-          setMessages((prev) => {
-            const exists = prev.find((m) => m.id === data.id);
-            if (exists) return prev;
-            return [
-              ...prev,
-              {
-                id: data.id,
-                senderId: data.senderId,
-                receiverId: data.receiverId,
-                body: data.body,
-                isRead: data.senderId === userId ? false : true,
-                isEdited: false,
-                createdAt: data.createdAt,
-                sender: data.sender || { id: data.senderId, name: "" },
-              },
-            ];
-          });
-        }
-      })
+    const setup = async () => {
+      if (isDestroyed) return;
+      
+      const supabase = getSupabase();
+      trackPresence(userId);
 
-      .subscribe();
+      channel = supabase
+        .channel(`user-${userId}`)
+        .on("broadcast", { event: "new-message" }, (payload: any) => {
+          const data = payload.payload;
+          const currentSelected = selectedUserRef.current;
+          if (
+            currentSelected &&
+            (data.senderId === currentSelected.id ||
+              data.receiverId === currentSelected.id)
+          ) {
+            setMessages((prev) => {
+              const exists = prev.find((m) => m.id === data.id);
+              if (exists) return prev;
+              return [
+                ...prev,
+                {
+                  id: data.id,
+                  senderId: data.senderId,
+                  receiverId: data.receiverId,
+                  body: data.body,
+                  isRead: data.senderId === userId ? false : true,
+                  isEdited: false,
+                  createdAt: data.createdAt,
+                  sender: data.sender || { id: data.senderId, name: "" },
+                },
+              ];
+            });
+          } else if (!currentSelected) {
+            loadConversations();
+          }
+        })
+        .subscribe();
+    };
+
+    setup();
 
     return () => {
-      supabase.removeChannel(channel);
+      isDestroyed = true;
+      if (channel) {
+        import("@/lib/supabaseRealtime").then(({ getSupabase }) => {
+          const supabase = getSupabase();
+          supabase.removeChannel(channel).catch(() => {});
+        }).catch(() => {});
+      }
     };
-  }, [userId, selectedUser, loadConversations]);
-
+  }, [userId]);
   // ==================== البحث ====================
   const searchUsers = async () => {
     if (searchTerm.length < 2 && !filterLevel && !filterRole) {
@@ -164,15 +183,16 @@ export default function ChatPage() {
 
   // ==================== فتح / إغلاق محادثة ====================
   const openChat = (chatUser: ChatUser | Conversation) => {
+    const c = chatUser as any;
     setSelectedUser({
-      id: chatUser.userId || chatUser.id,
-      name: chatUser.name,
-      role: chatUser.role,
-      level: chatUser.level,
-      lastSeenAt: (chatUser as any).lastSeenAt,
-      lastLoginAt: (chatUser as any).lastLoginAt,
+      id: c.userId || c.id,
+      name: c.name,
+      role: c.role,
+      level: c.level,
+      lastSeenAt: c.lastSeenAt,
+      lastLoginAt: c.lastLoginAt,
     });
-    loadMessages((chatUser as any).userId || (chatUser as any).id);
+    loadMessages(c.userId || c.id);
     setShowMobileChat(true);
     setShowSearch(false);
     setSearchResults([]);

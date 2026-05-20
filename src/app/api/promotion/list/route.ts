@@ -33,7 +33,12 @@ export async function GET(request: NextRequest) {
     const where: any = {};
 
     if (status) where.status = status;
-    if (level) where.toLevel = level;
+    const userLevel = payload.level as string | undefined;
+    if (payload.role === "MANAGEMENT" && userLevel) {
+      where.toLevel = userLevel;
+    } else if (level) {
+      where.toLevel = level;
+    }
 
     const [data, total] = await Promise.all([
       prisma.promotionRequest.findMany({
@@ -57,10 +62,8 @@ export async function GET(request: NextRequest) {
       page,
       limit,
     });
-  } catch {
-    return NextResponse.json(
-      { success: false, message: "حدث خطأ" },
-      { status: 500 },
-    );
+  } catch (error) {
+    console.error("Promotion list error:", error);
+    return NextResponse.json({ success: false, error: "خطأ في جلب طلبات الترقية" }, { status: 500 });
   }
 }

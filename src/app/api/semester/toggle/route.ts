@@ -35,6 +35,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // عزل المستوى: MANAGEMENT يستطيع فقط تعديل مواد من مستواه
+    if (payload.role !== "ADMIN") {
+      const userLevel = payload.level;
+      const subjects = await prisma.subject.findMany({
+        where: { id: { in: subjectIds } },
+        select: { level: true },
+      });
+      const allFromSameLevel = subjects.every((s) => s.level === userLevel);
+      if (!allFromSameLevel || subjects.length !== subjectIds.length) {
+        return NextResponse.json(
+          { success: false, error: "لا يمكنك تعديل مواد من مستوى آخر" },
+          { status: 403 },
+        );
+      }
+    }
+
     // تحديث حالة isVisible للمواد المحددة
     await prisma.subject.updateMany({
       where: { id: { in: subjectIds } },

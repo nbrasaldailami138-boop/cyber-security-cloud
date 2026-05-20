@@ -281,7 +281,9 @@ export default function GenerateManagementPage() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() =>
-                  router.push(isAdmin ? "/admin/generation" : "/management")
+                  router.push(
+                    userRole === "ADMIN" ? "/admin/generation" : "/management",
+                  )
                 }
                 style={{
                   width: "42px",

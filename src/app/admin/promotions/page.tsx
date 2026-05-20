@@ -169,7 +169,7 @@ export default function PromotionsPage() {
   // ==================== فتح نافذة الصلاحيات ====================
   const openPermModal = (targetUser: SearchUser) => {
     setPermModal(targetUser);
-    setGrantPublish(!targetUser.uploadPermissions?.length);
+    setGrantPublish(!(targetUser.uploadPermissions?.length ?? 0));
     setGrantManagement(!targetUser.managementLevel);
   };
 
@@ -352,7 +352,7 @@ export default function PromotionsPage() {
       STUDENT: "#00e5ff",
     })[r] || "#8b949e";
   const hasPermissions = (u: SearchUser) =>
-    (u.uploadPermissions?.length || 0) > 0 || !!u.managementLevel;
+    (u.uploadPermissions?.length ?? 0) > 0 || !!u.managementLevel;
 
   const glassStyle: React.CSSProperties = {
     background: "rgba(10,20,40,0.5)",
@@ -709,7 +709,7 @@ export default function PromotionsPage() {
                             >
                               {getRoleLabel(u.role)}
                             </span>
-                            {u.uploadPermissions?.length > 0 && (
+                            {u.uploadPermissions && u.uploadPermissions.length > 0 && (
                               <span
                                 style={{
                                   color: "#bf5af2",

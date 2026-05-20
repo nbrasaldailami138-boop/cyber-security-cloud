@@ -50,6 +50,14 @@ export async function POST(request: NextRequest) {
     const ip = request.headers.get("x-forwarded-for") || "unknown";
     const results: any[] = [];
 
+    // عزل الإدارة: لا يمكن توليد أكواد لمستوى آخر
+    if (payload.role === "MANAGEMENT" && payload.level && level !== payload.level) {
+      return NextResponse.json(
+        { success: false, message: "لا يمكنك توليد أكواد تفعيل لمستوى آخر" },
+        { status: 403 },
+      );
+    }
+
     for (const name of names) {
       const trimmedName = name.trim();
       if (!trimmedName) continue;

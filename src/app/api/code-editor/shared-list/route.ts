@@ -29,6 +29,9 @@ export async function GET(request: NextRequest) {
     const level =
       effectiveRole === "ADMIN" ? requestedLevel || userLevel : userLevel;
 
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20")));
+
     const existingShares = await prisma.systemConfig.findFirst({
       where: { key: "code_editor_shares" },
     });
@@ -42,8 +45,17 @@ export async function GET(request: NextRequest) {
 
     // فلترة حسب المستوى
     const filtered = shares.filter((s: any) => s.level === level);
+    const total = filtered.length;
+    const paginatedData = filtered.slice((page - 1) * limit, page * limit);
 
-    return NextResponse.json({ success: true, data: filtered });
+    return NextResponse.json({
+      success: true,
+      data: paginatedData,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    });
   } catch (error) {
     console.error("Shared list error:", error);
     return NextResponse.json(

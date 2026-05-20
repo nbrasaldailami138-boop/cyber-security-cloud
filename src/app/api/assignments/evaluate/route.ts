@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { prisma } from "@/lib/prisma";
-import { getSupabase } from "@/lib/supabaseRealtime";
+import { broadcastEvent } from "@/lib/supabaseRealtime";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
 
@@ -102,46 +102,31 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // إشعار فوري عبر Supabase
-    const supabase = getSupabase();
+    // إشعار فوري للطالب عبر Supabase Realtime
+    broadcastEvent(`user-${assignment.studentId}`, "notification", {
+      id: notification.id,
+      type: "ASSIGNMENT_EVALUATED",
+      title: "تم تقييم التكليف",
+      body: `تم تقييم تكليفك في مادة ${assignment.subject.name} بمقدار ${grade} درجة`,
+      linkUrl: "/student",
+    });
 
-    // إشعار notification للطالب
-    await supabase
-      .from("system_configs")
-      .upsert({
-        key: `ev_user-${assignment.studentId}_notification_${Date.now()}`,
-        value: JSON.stringify({
-          id: notification.id,
-          type: "ASSIGNMENT_EVALUATED",
-          title: "تم تقييم التكليف",
-          body: `تم تقييم تكليفك في مادة ${assignment.subject.name} بمقدار ${grade} درجة`,
-          linkUrl: "/student",
-        }),
-      })
-      .catch(() => {});
+    broadcastEvent(`user-${assignment.studentId}`, "assignment-update", {
+      id: assignmentId,
+      subjectName: assignment.subject.name,
+      grade,
+      status: "evaluated",
+    });
 
-    // إشعار assignment-update للطالب
-    await supabase
-      .from("system_configs")
-      .upsert({
-        key: `ev_user-${assignment.studentId}_assignment-update_${Date.now()}`,
-        value: JSON.stringify({
-          id: assignmentId,
-          subjectName: assignment.subject.name,
-          grade,
-          status: "evaluated",
-        }),
-      })
-      .catch(() => {});
     // إرسال Push Notification مع صوت
     try {
       const { sendPushToUsers } = await import("@/lib/pushNotifications");
-      await sendPushToUsers([assignment.studentId], {
+      sendPushToUsers([assignment.studentId], {
         title: "✅ تم تقييم التكليف",
         body: `تم تقييم تكليفك في ${assignment.subject.name} بمقدار ${grade} درجة`,
         data: { url: "/student" },
         sound: "/sounds/notification.mp3",
-      });
+      }).catch(() => {});
     } catch {}
     await prisma.auditLog.create({
       data: {

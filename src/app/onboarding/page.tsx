@@ -471,11 +471,9 @@ export default function OnboardingPage() {
             flex: 1,
             height: "52px",
             borderRadius: "14px",
-            border: "none",
             background: isLast
               ? "linear-gradient(135deg, #00e5ff, #007bff)"
               : "linear-gradient(135deg, rgba(0,229,255,0.2), rgba(0,229,255,0.05))",
-            borderImage: isLast ? "none" : "1px solid rgba(0,229,255,0.3)",
             border: isLast ? "none" : "1px solid rgba(0,229,255,0.3)",
             color: isLast ? "#010204" : "#00e5ff",
             cursor: "pointer",

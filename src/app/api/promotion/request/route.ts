@@ -35,11 +35,9 @@ export async function GET(request: NextRequest) {
       success: true,
       data: { semester: config?.value || "TERM_1" },
     });
-  } catch {
-    return NextResponse.json(
-      { success: false, message: "حدث خطأ" },
-      { status: 500 },
-    );
+  } catch (error) {
+    console.error("Promotion config error:", error);
+    return NextResponse.json({ success: false, message: "حدث خطأ" }, { status: 500 });
   }
 }
 
@@ -77,6 +75,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // عزل الإدارة: لا يمكن إنشاء طلبات ترقية لمستوى آخر
+    const userLevel = payload.level as string | undefined;
+    if (payload.role === "MANAGEMENT" && userLevel && fromLevel !== userLevel) {
+      return NextResponse.json(
+        { success: false, message: "لا يمكنك إنشاء طلبات ترقية لمستوى آخر" },
+        { status: 403 },
+      );
+    }
+
     const students = await prisma.user.findMany({
       where: {
         id: { in: studentIds },
@@ -106,10 +113,8 @@ export async function POST(request: NextRequest) {
       message: "تم إرسال طلبات الترقية",
       count: students.length,
     });
-  } catch {
-    return NextResponse.json(
-      { success: false, message: "حدث خطأ" },
-      { status: 500 },
-    );
+  } catch (error) {
+    console.error("Promotion request error:", error);
+    return NextResponse.json({ success: false, message: "حدث خطأ" }, { status: 500 });
   }
 }

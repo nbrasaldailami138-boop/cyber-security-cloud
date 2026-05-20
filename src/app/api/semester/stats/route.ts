@@ -36,10 +36,12 @@ export async function GET(request: NextRequest) {
       LEVEL_4: "المستوى الرابع",
     };
 
-    const availableLevels =
+    const availableLevels: string[] =
       effectiveRole === "ADMIN"
         ? ["LEVEL_1", "LEVEL_2", "LEVEL_3", "LEVEL_4"]
-        : [userLevel];
+        : userLevel
+          ? [userLevel]
+          : [];
 
     const levelBreakdown = await Promise.all(
       availableLevels.map(async (level) => {

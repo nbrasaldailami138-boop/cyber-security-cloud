@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { prisma } from "@/lib/prisma";
-import { getSupabase } from "@/lib/supabaseRealtime";
+import { broadcastEvent } from "@/lib/supabaseRealtime";
 import { sendPushToUsers } from "@/lib/pushNotifications";
 
 const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_ACCESS_SECRET!);
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     let subjectName = "";
     let targetLevel = user.level || "";
-    let studentNotifications: {
+    const studentNotifications: {
       id: string;
       grade: string;
       feedback: string;
@@ -132,34 +132,35 @@ export async function POST(request: NextRequest) {
     if (studentNotifications.length > 0) {
       const msgType = publishType || "التقييم";
 
-      for (const sn of studentNotifications) {
+      // إنشاء إشعارات داخلية دفعة واحدة
+      const notificationsData = studentNotifications.map((sn) => {
         let body = `قام معلم ${subjectName} برفع درجاتك في ${msgType}. درجتك: ${sn.grade}`;
         if (sn.feedback) body += ` - ملاحظة: ${sn.feedback}`;
+        return {
+          userId: sn.id,
+          type: "GRADES_DISTRIBUTED" as const,
+          title: "📊 توزيع درجات",
+          body,
+          linkUrl: "/student",
+        };
+      });
 
-        await prisma.notification.create({
-          data: {
-            userId: sn.id,
-            type: "GRADES_DISTRIBUTED",
-            title: "📊 توزيع درجات",
-            body,
-            linkUrl: "/student",
-          },
+      if (notificationsData.length > 0) {
+        await prisma.notification.createMany({
+          data: notificationsData,
         });
-
-        try {
-          const supabase = getSupabase();
-          await supabase.from("system_configs").upsert({
-            key: `ev_user-${sn.id}_notification_${Date.now()}_${Math.random()}`,
-            value: JSON.stringify({
-              type: "GRADES_DISTRIBUTED",
-              title: "📊 توزيع درجات",
-              body,
-              linkUrl: "/student",
-            }),
-          });
-        } catch {}
       }
 
+      // إشعار لحظي لجميع طلاب المستوى دفعة واحدة
+      broadcastEvent(`level-${targetLevel}`, "grades-published", {
+        type: "GRADES_DISTRIBUTED",
+        title: "📊 توزيع درجات",
+        body: `قام معلم ${subjectName} برفع درجات ${msgType} لـ ${studentNotifications.length} طالب`,
+        linkUrl: "/student",
+        level: targetLevel,
+      });
+
+      // إرسال Push Notifications
       try {
         await sendPushToUsers(
           studentNotifications.map((s) => s.id),

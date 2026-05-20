@@ -5,12 +5,10 @@ export function getSiteKey(): string {
   return HCAPTCHA_SITE_KEY || "10000000-ffff-ffff-ffff-000000000000";
 }
 
-export async function verifyCaptcha(
-  token: string | null,
-): Promise<boolean> {
-  // في وضع التطوير أو إذا ما في secret key، نقبل الطلب
-  if (!HCAPTCHA_SECRET || process.env.NODE_ENV === "development") {
-    return true;
+export async function verifyCaptcha(token: string | null): Promise<boolean> {
+  // إذا ما في secret key، نقبل الطلب (للاختبار فقط)
+  if (!HCAPTCHA_SECRET) {
+    return false;
   }
 
   if (!token) return false;

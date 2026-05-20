@@ -70,6 +70,10 @@ export async function GET(request: NextRequest) {
       if (filterRole) where.role = filterRole;
     }
 
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20")));
+    const skipVal = (page - 1) * limit;
+
     const users = await prisma.user.findMany({
       where,
       select: {
@@ -81,7 +85,8 @@ export async function GET(request: NextRequest) {
         lastLoginAt: true,
       },
       orderBy: { name: "asc" },
-      take: 50,
+      skip: skipVal,
+      take: limit,
     });
 
     return NextResponse.json({ success: true, data: users });

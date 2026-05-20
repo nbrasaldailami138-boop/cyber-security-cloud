@@ -1151,7 +1151,9 @@ export default function StudentDashboard() {
                                 fontSize: "1rem",
                               }}
                             >
-                              {item.subjectName}
+                              {item.subject?.name ||
+                                (item as any).subjectName ||
+                                ""}
                             </div>
                             <div
                               style={{
@@ -1160,7 +1162,9 @@ export default function StudentDashboard() {
                                 marginTop: "2px",
                               }}
                             >
-                              {formatDate(item.evaluatedAt || item.createdAt)}
+                              {formatDate(
+                                (item as any).evaluatedAt || item.createdAt,
+                              )}
                             </div>
                           </div>
                           <div

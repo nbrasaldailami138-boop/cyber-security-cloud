@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
-const ACCESS_SECRET = new TextEncoder().encode(
-  process.env.JWT_ACCESS_SECRET || "default-secret",
-);
+const JWT_SECRET = process.env.JWT_ACCESS_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("JWT_ACCESS_SECRET environment variable is required");
+}
+const ACCESS_SECRET = new TextEncoder().encode(JWT_SECRET);
 
 const publicPaths = [
   "/",
@@ -20,7 +22,6 @@ const publicPaths = [
   "/api/auth/logout",
   "/api/auth/webauthn/login/start",
   "/api/auth/webauthn/login/complete",
-  "/api/subjects/active",
 ];
 
 const csrfExemptPaths = [
@@ -32,7 +33,6 @@ const csrfExemptPaths = [
   "/api/auth/refresh",
   "/api/auth/logout",
   "/api/auth/webauthn",
-  "/api/subjects/active",
 ];
 
 const adminPaths = ["/admin"];
@@ -45,8 +45,7 @@ function isPublicPath(pathname: string): boolean {
     (p) =>
       pathname === p ||
       pathname.startsWith("/_next") ||
-      pathname.startsWith("/api/auth") ||
-      pathname.startsWith("/api/subjects"),
+      pathname.startsWith("/api/auth"),
   );
 }
 
@@ -64,14 +63,14 @@ export async function middleware(request: NextRequest) {
   );
   response.headers.set(
     "Content-Security-Policy",
-    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.hcaptcha.com https://newassets.hcaptcha.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https://ik.imagekit.io; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.upstash.io https://sentry.hcaptcha.com https://*.supabase.co wss://*.supabase.co; frame-src 'self' https://www.youtube.com https://newassets.hcaptcha.com;",
+    "default-src 'self'; script-src 'self' 'unsafe-inline' https://js.hcaptcha.com https://newassets.hcaptcha.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https://ik.imagekit.io; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.upstash.io https://sentry.hcaptcha.com https://*.supabase.co wss://*.supabase.co; frame-src 'self' https://www.youtube.com https://newassets.hcaptcha.com;",
   );
 
   const method = request.method;
 
   // تعيين CSRF token إذا لم يكن موجوداً
   if (!request.cookies.get("csrf-token")?.value) {
-    const bytes = new Uint8Array(4);
+    const bytes = new Uint8Array(32);
     crypto.getRandomValues(bytes);
     const token = Array.from(bytes)
       .map((b) => b.toString(16).padStart(2, "0"))
@@ -85,9 +84,8 @@ export async function middleware(request: NextRequest) {
     });
   }
 
-  // التحقق من CSRF لـ API requests (POST/PUT/DELETE) - فقط في الإنتاج
+  // التحقق من CSRF لـ API requests (POST/PUT/DELETE)
   if (
-    process.env.NODE_ENV === "production" &&
     ["POST", "PUT", "DELETE", "PATCH"].includes(method) &&
     pathname.startsWith("/api/") &&
     !csrfExemptPaths.some((p) => pathname.startsWith(p))

@@ -41,8 +41,9 @@ async function extractTextFromFile(
   // لـ PDF: استخدم pdf-parse أولاً
   if (mimeType === "application/pdf" || fileName.endsWith(".pdf")) {
     try {
-      const pdfParse = (await import("pdf-parse")).default;
-      const data = await pdfParse(buffer);
+      const pdfParse = await import("pdf-parse");
+      const parseFn = (pdfParse as any).default || pdfParse;
+      const data = await parseFn(buffer);
       const text = data.text || "";
       if (
         text.length < 100 ||

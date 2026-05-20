@@ -5,46 +5,82 @@ import { getSupabase } from "@/lib/supabaseRealtime";
 
 type EventHandler = (data: any) => void;
 
+interface EventConfig {
+  event: string;
+  handler: EventHandler;
+}
+
+type EventsArg = EventConfig[] | string;
+
+function normalizeEvents(events: EventsArg, handler?: EventHandler): EventConfig[] {
+  if (typeof events === "string") {
+    // التوقيع القديم: (channelName, eventName, handler)
+    if (handler) {
+      return [{ event: events, handler }];
+    }
+    return [];
+  }
+  // التوقيع الجديد: (channelName, EventConfig[])
+  return events;
+}
+
 export function useSupabaseRealtime(
   channelName: string,
-  eventName: string,
-  handler: EventHandler,
+  events: EventsArg,
+  handler?: EventHandler,
 ) {
-  const handlerRef = useRef<EventHandler>(handler);
+  const normalizedEvents = normalizeEvents(events, handler);
+  const handlersRef = useRef<EventConfig[]>(normalizedEvents);
 
   useEffect(() => {
-    handlerRef.current = handler;
-  }, [handler]);
+    handlersRef.current = normalizedEvents;
+  }, [normalizedEvents]);
 
   const subscribe = useCallback(() => {
     try {
       const supabase = getSupabase();
+      const channel = supabase.channel(channelName);
 
-      const channel = supabase
-        .channel(channelName)
-        .on("broadcast", { event: eventName }, (payload: any) => {
-          handlerRef.current(payload.payload);
-        })
-        .subscribe((status: string) => {
-          if (status === "SUBSCRIBED") {
-            // Successfully subscribed
-          } else if (status === "CHANNEL_ERROR") {
-            // Channel error
+      // ربط جميع الأحداث على نفس القناة
+      for (const { event } of normalizedEvents) {
+        channel.on("broadcast", { event }, (payload: any) => {
+          const currentHandlers = handlersRef.current;
+          const config = currentHandlers.find((e) => e.event === event);
+          if (config) {
+            config.handler(payload.payload);
           }
         });
+      }
 
-      return () => {
-        supabase.removeChannel(channel).catch(() => {});
-      };
+      channel.subscribe((status: string) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          setTimeout(() => subscribe(), 2000);
+        }
+      });
+
+      return channel;
     } catch {
-      return () => {};
+      return null;
     }
-  }, [channelName, eventName]);
+  }, [channelName, normalizedEvents]);
 
   useEffect(() => {
-    const cleanup = subscribe();
+    const channel = subscribe();
     return () => {
-      cleanup?.();
+      if (channel) {
+        const supabase = getSupabase();
+        supabase.removeChannel(channel).catch(() => {});
+      }
     };
   }, [subscribe]);
+
+  // دالة مساعدة للإرسال (اختياري)
+  const sendBroadcast = useCallback(
+    (event: string, data: any) => {
+      // الإرسال يتم عبر broadcastEvent من supabaseRealtime مباشرة
+    },
+    [],
+  );
+
+  return { sendBroadcast };
 }

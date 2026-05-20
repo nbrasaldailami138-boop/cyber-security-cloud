@@ -29,8 +29,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const userFilter =
-      userRole === "MANAGEMENT" && userLevel ? { level: userLevel as any } : {};
+    const isManagement = userRole === "MANAGEMENT";
+    const userFilter = isManagement && userLevel ? { level: userLevel as any } : {};
+    const contentFilter = isManagement && userLevel ? { level: userLevel as any } : {};
 
     const [
       totalUsers,
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
       prisma.assignment.count({
         where: { grade: { not: null }, deletedAt: null },
       }),
-      prisma.content.count({ where: { deletedAt: null } }),
+      prisma.content.count({ where: { ...contentFilter, deletedAt: null } }),
       prisma.subject.count({ where: { ...userFilter, deletedAt: null } }),
     ]);
 

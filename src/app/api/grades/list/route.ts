@@ -36,11 +36,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const isTeacher = user.role === "TEACHER" || !!user.managementLevel;
-    const isAdmin = user.role === "ADMIN" || user.role === "MANAGEMENT";
+    const isTeacher = user.role === "TEACHER";
+    const isManagement = user.role === "MANAGEMENT" || !!user.managementLevel;
+    const isAdmin = user.role === "ADMIN";
 
-    // الطالب، المعلم، المرقى، الأدمن، الإدارة - الكل مسموح
-    if (userRole !== "STUDENT" && !isTeacher && !isAdmin) {
+    // الطالب، المعلم، الإدارة، الأدمن - الكل مسموح
+    if (userRole !== "STUDENT" && !isTeacher && !isManagement && !isAdmin) {
       return NextResponse.json(
         { success: false, message: "غير مصرح" },
         { status: 403 },
@@ -103,10 +104,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // ========== للمعلم والإدارة: جلب سجل توزيعات الدرجات ==========
+    // ========== للمعلم: جلب سجل توزيعات الدرجات ==========
     const whereDist: any = { deletedAt: null };
 
-    if (isTeacher && !isAdmin) {
+    if (isTeacher) {
       whereDist.teacherId = userId;
     }
 
