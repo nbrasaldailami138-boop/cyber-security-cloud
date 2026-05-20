@@ -34,8 +34,38 @@ export async function GET(request: NextRequest) {
     const otherUserId = searchParams.get("userId");
 
     // التحقق من العزل الأكاديمي
-    function isSameLevel(targetUserLevel: string | null): boolean {
+    function isSameLevel(
+      targetUserLevel: string | null,
+      targetUserRole?: string,
+    ): boolean {
+      // ADMIN يرى الكل
       if (userRole === "ADMIN") return true;
+
+      // MANAGEMENT ترى مستواها فقط + ADMIN
+      if (userRole === "MANAGEMENT" || payload.managementLevel) {
+        if (targetUserRole === "ADMIN") return true;
+        if (!targetUserLevel || !userLevel) return false;
+        return targetUserLevel === userLevel;
+      }
+
+      // TEACHER يرى ADMIN + MANAGEMENT مستواه + طلاب مستواه فقط
+      if (userRole === "TEACHER") {
+        if (targetUserRole === "ADMIN") return true;
+        if (targetUserRole === "MANAGEMENT")
+          return targetUserLevel === userLevel;
+        if (targetUserRole === "STUDENT") return targetUserLevel === userLevel;
+        return false;
+      }
+
+      // STUDENT يرى ADMIN + MANAGEMENT مستواه + معلمين مستواه فقط
+      if (userRole === "STUDENT") {
+        if (targetUserRole === "ADMIN") return true;
+        if (targetUserRole === "MANAGEMENT")
+          return targetUserLevel === userLevel;
+        if (targetUserRole === "TEACHER") return targetUserLevel === userLevel;
+        return false;
+      }
+
       if (!targetUserLevel || !userLevel) return false;
       return targetUserLevel === userLevel;
     }
@@ -43,7 +73,10 @@ export async function GET(request: NextRequest) {
     if (!otherUserId) {
       // جلب قائمة المحادثات
       const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
-      const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "20")));
+      const limit = Math.min(
+        50,
+        Math.max(1, parseInt(searchParams.get("limit") || "20")),
+      );
       const skip = (page - 1) * limit;
 
       const messages = await prisma.message.findMany({
@@ -65,10 +98,24 @@ export async function GET(request: NextRequest) {
           isRead: true,
           createdAt: true,
           sender: {
-            select: { id: true, name: true, role: true, level: true, lastSeenAt: true, lastLoginAt: true },
+            select: {
+              id: true,
+              name: true,
+              role: true,
+              level: true,
+              lastSeenAt: true,
+              lastLoginAt: true,
+            },
           },
           receiver: {
-            select: { id: true, name: true, role: true, level: true, lastSeenAt: true, lastLoginAt: true },
+            select: {
+              id: true,
+              name: true,
+              role: true,
+              level: true,
+              lastSeenAt: true,
+              lastLoginAt: true,
+            },
           },
         },
       });
@@ -82,7 +129,7 @@ export async function GET(request: NextRequest) {
         if (!seen.has(key)) {
           seen.add(key);
           // العزل الأكاديمي: تخطي المحادثات من مستويات مختلفة (لغير ADMIN)
-          if (!isSameLevel(other.level)) continue;
+          if (!isSameLevel(other.level, other.role)) continue;
           const body = msg.encrypted ? decryptMessage(msg.body) : msg.body;
           conversations.push({
             userId: other.id,
@@ -113,7 +160,7 @@ export async function GET(request: NextRequest) {
           { status: 404 },
         );
       }
-      if (!isSameLevel(otherUser.level)) {
+      if (!isSameLevel(otherUser.level, "STUDENT")) {
         return NextResponse.json(
           { success: false, message: "غير مصرح بالوصول لمحادثات هذا المستخدم" },
           { status: 403 },
@@ -121,7 +168,10 @@ export async function GET(request: NextRequest) {
       }
 
       const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
-      const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "30")));
+      const limit = Math.min(
+        50,
+        Math.max(1, parseInt(searchParams.get("limit") || "30")),
+      );
       const skip = (page - 1) * limit;
 
       const messages = await prisma.message.findMany({
@@ -130,8 +180,16 @@ export async function GET(request: NextRequest) {
             { deletedAt: null },
             {
               OR: [
-                { senderId: userId, receiverId: otherUserId, senderDeleted: false },
-                { senderId: otherUserId, receiverId: userId, receiverDeleted: false },
+                {
+                  senderId: userId,
+                  receiverId: otherUserId,
+                  senderDeleted: false,
+                },
+                {
+                  senderId: otherUserId,
+                  receiverId: userId,
+                  receiverDeleted: false,
+                },
               ],
             },
           ],
@@ -150,7 +208,11 @@ export async function GET(request: NextRequest) {
           createdAt: true,
           sender: { select: { id: true, name: true } },
           replyTo: {
-            select: { id: true, body: true, sender: { select: { id: true, name: true } } },
+            select: {
+              id: true,
+              body: true,
+              sender: { select: { id: true, name: true } },
+            },
           },
         },
       });
